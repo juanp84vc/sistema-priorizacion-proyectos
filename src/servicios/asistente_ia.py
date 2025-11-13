@@ -14,7 +14,7 @@ from models.evaluacion import ResultadoEvaluacion
 # Asegurar que las variables de entorno estén cargadas
 # Buscar el archivo .env en la raíz del proyecto
 env_path = Path(__file__).parent.parent.parent / '.env'
-load_dotenv(dotenv_path=env_path)
+load_dotenv(dotenv_path=env_path, override=True)
 
 
 class AsistenteIA:
@@ -30,8 +30,16 @@ class AsistenteIA:
         Args:
             api_key: API key de Google Gemini (si no se proporciona, lee de .env)
         """
+        # Recargar .env para asegurar que está actualizado
+        load_dotenv(dotenv_path=env_path, override=True)
+
         # Obtener API key
         self.api_key = api_key or os.getenv('GOOGLE_API_KEY')
+
+        # Debug: imprimir información
+        print(f"DEBUG - API Key cargada: {self.api_key[:20] if self.api_key else 'None'}...")
+        print(f"DEBUG - Ruta .env: {env_path}")
+        print(f"DEBUG - .env existe: {env_path.exists()}")
 
         if not self.api_key or self.api_key == 'YOUR_ACTUAL_API_KEY_HERE':
             raise ValueError(
