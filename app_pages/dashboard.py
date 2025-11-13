@@ -81,41 +81,12 @@ def show():
     st.markdown("---")
 
     # Visualizaciones
+    st.markdown("### 🌍 Distribución Geográfica")
+
     col1, col2 = st.columns(2)
 
     with col1:
-        # Distribución por ODS
-        st.markdown("### 🎯 Distribución por ODS")
-
-        # Contar ODS
-        todos_ods = []
-        for p in proyectos:
-            todos_ods.extend(p.ods_vinculados)
-
-        contador_ods = Counter(todos_ods)
-
-        df_ods = pd.DataFrame([
-            {'ODS': ods, 'Proyectos': count}
-            for ods, count in contador_ods.most_common()
-        ])
-
-        fig_ods = px.bar(
-            df_ods,
-            x='ODS',
-            y='Proyectos',
-            color='Proyectos',
-            color_continuous_scale='Viridis',
-            title='Proyectos por ODS'
-        )
-
-        fig_ods.update_layout(showlegend=False)
-
-        st.plotly_chart(fig_ods, use_container_width=True)
-
-    with col2:
         # Distribución por área geográfica
-        st.markdown("### 🌍 Distribución Geográfica")
-
         areas = [p.area_geografica.value for p in proyectos]
         contador_areas = Counter(areas)
 
@@ -132,6 +103,33 @@ def show():
         )
 
         st.plotly_chart(fig_areas, use_container_width=True)
+
+    with col2:
+        # Distribución por departamentos
+        todos_deptos = []
+        for p in proyectos:
+            todos_deptos.extend(p.departamentos)
+
+        contador_deptos = Counter(todos_deptos)
+        top_deptos = contador_deptos.most_common(10)
+
+        df_deptos = pd.DataFrame([
+            {'Departamento': depto, 'Proyectos': count}
+            for depto, count in top_deptos
+        ])
+
+        fig_deptos = px.bar(
+            df_deptos,
+            x='Departamento',
+            y='Proyectos',
+            title='Top 10 Departamentos',
+            color='Proyectos',
+            color_continuous_scale='Viridis'
+        )
+
+        fig_deptos.update_layout(showlegend=False, xaxis_tickangle=-45)
+
+        st.plotly_chart(fig_deptos, use_container_width=True)
 
     # Presupuestos
     st.markdown("---")
@@ -270,7 +268,6 @@ def show():
             'Beneficiarios': formatear_numero(p.beneficiarios_totales, 0),
             'Duración (años)': formatear_numero(p.duracion_años, 1),
             'Área': p.area_geografica.value,
-            'ODS': len(p.ods_vinculados),
             'Estado': p.estado.value
         }
         for p in proyectos
@@ -325,7 +322,6 @@ def show():
 - **Área Geográfica:** {p.area_geografica.value}
 - **Departamentos:** {', '.join(p.departamentos)}
 {f"- **Municipios:** {', '.join(p.municipios)}" if p.municipios else ""}
-- **ODS Vinculados:** {', '.join(p.ods_vinculados)}
 - **Estado:** {p.estado.value}
 - **Costo por Beneficiario:** ${formatear_numero(p.presupuesto_por_beneficiario)}
 
@@ -380,9 +376,6 @@ def show():
 **Presupuesto Total:** ${formatear_numero(p.presupuesto_total)}
 **Duración:** {formatear_numero(p.duracion_meses, 0)} meses ({formatear_numero(p.duracion_años, 1)} años)
 **Costo por Beneficiario:** ${formatear_numero(p.presupuesto_por_beneficiario)}
-
-### ALINEACIÓN CON ODS
-{', '.join(p.ods_vinculados)}
 
 ### INDICADORES DE CAPACIDAD ORGANIZACIONAL
 - **Años de experiencia:** {p.indicadores_impacto.get('años_experiencia', 'N/A')}
