@@ -44,16 +44,29 @@ class AsistenteIA:
         # 1. Parámetro directo
         # 2. Streamlit secrets (Streamlit Cloud)
         # 3. Variable de entorno (local con .env)
+        self.api_key = None
+
         if api_key:
             self.api_key = api_key
-        elif STREAMLIT_AVAILABLE and hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets:
-            self.api_key = st.secrets['GOOGLE_API_KEY']
-        else:
+        elif STREAMLIT_AVAILABLE and hasattr(st, 'secrets'):
+            try:
+                if 'GOOGLE_API_KEY' in st.secrets:
+                    self.api_key = st.secrets['GOOGLE_API_KEY']
+            except:
+                pass  # Si no hay secrets.toml, usar variable de entorno
+
+        if not self.api_key:
             self.api_key = os.getenv('GOOGLE_API_KEY')
 
         # Debug: imprimir información
+        fuente = "Variable de entorno"
+        if api_key:
+            fuente = "Parámetro directo"
+        elif self.api_key and self.api_key != os.getenv('GOOGLE_API_KEY'):
+            fuente = "Streamlit Secrets"
+
         print(f"DEBUG - API Key cargada: {self.api_key[:20] if self.api_key else 'None'}...")
-        print(f"DEBUG - Fuente: {'Parámetro' if api_key else 'Streamlit Secrets' if STREAMLIT_AVAILABLE and hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets else 'Variable de entorno'}")
+        print(f"DEBUG - Fuente: {fuente}")
         print(f"DEBUG - Ruta .env: {env_path}")
         print(f"DEBUG - .env existe: {env_path.exists()}")
 
@@ -69,8 +82,8 @@ class AsistenteIA:
         # Configurar Gemini
         genai.configure(api_key=self.api_key)
 
-        # Usar Gemini 1.5 Flash (modelo rápido y gratis)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # Usar Gemini 2.5 Flash (modelo estable, rápido y gratis)
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
 
         # Historial de conversación
         self.historial_chat: List[Dict[str, str]] = []
