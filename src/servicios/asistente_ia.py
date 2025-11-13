@@ -5,9 +5,13 @@ Proporciona análisis inteligente de proyectos y responde preguntas contextuales
 import os
 from typing import List, Dict, Optional
 from datetime import datetime
+from dotenv import load_dotenv
 import google.generativeai as genai
 from models.proyecto import ProyectoSocial
 from models.evaluacion import ResultadoEvaluacion
+
+# Asegurar que las variables de entorno estén cargadas
+load_dotenv()
 
 
 class AsistenteIA:
