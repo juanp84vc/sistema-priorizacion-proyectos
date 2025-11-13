@@ -12,9 +12,16 @@ from models.proyecto import ProyectoSocial
 from models.evaluacion import ResultadoEvaluacion
 
 # Asegurar que las variables de entorno estén cargadas
-# Buscar el archivo .env en la raíz del proyecto
+# Buscar el archivo .env en la raíz del proyecto (para desarrollo local)
 env_path = Path(__file__).parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path, override=True)
+
+# Intentar importar streamlit para acceso a secrets (Streamlit Cloud)
+try:
+    import streamlit as st
+    STREAMLIT_AVAILABLE = True
+except ImportError:
+    STREAMLIT_AVAILABLE = False
 
 
 class AsistenteIA:
@@ -28,24 +35,35 @@ class AsistenteIA:
         Inicializa el asistente IA.
 
         Args:
-            api_key: API key de Google Gemini (si no se proporciona, lee de .env)
+            api_key: API key de Google Gemini (si no se proporciona, lee de .env o st.secrets)
         """
-        # Recargar .env para asegurar que está actualizado
+        # Recargar .env para asegurar que está actualizado (desarrollo local)
         load_dotenv(dotenv_path=env_path, override=True)
 
-        # Obtener API key
-        self.api_key = api_key or os.getenv('GOOGLE_API_KEY')
+        # Obtener API key de múltiples fuentes (en orden de prioridad):
+        # 1. Parámetro directo
+        # 2. Streamlit secrets (Streamlit Cloud)
+        # 3. Variable de entorno (local con .env)
+        if api_key:
+            self.api_key = api_key
+        elif STREAMLIT_AVAILABLE and hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets:
+            self.api_key = st.secrets['GOOGLE_API_KEY']
+        else:
+            self.api_key = os.getenv('GOOGLE_API_KEY')
 
         # Debug: imprimir información
         print(f"DEBUG - API Key cargada: {self.api_key[:20] if self.api_key else 'None'}...")
+        print(f"DEBUG - Fuente: {'Parámetro' if api_key else 'Streamlit Secrets' if STREAMLIT_AVAILABLE and hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets else 'Variable de entorno'}")
         print(f"DEBUG - Ruta .env: {env_path}")
         print(f"DEBUG - .env existe: {env_path.exists()}")
 
-        # Validación simplificada - si no hay API key, dejamos que Gemini lance el error
+        # Validación simplificada
         if not self.api_key:
             raise ValueError(
-                "API key de Google Gemini no encontrada en variables de entorno. "
-                f"Verifica que el archivo {env_path} existe y contiene GOOGLE_API_KEY"
+                "API key de Google Gemini no encontrada. "
+                "Configura GOOGLE_API_KEY en:\n"
+                "- Desarrollo local: archivo .env en la raíz del proyecto\n"
+                "- Streamlit Cloud: Settings > Secrets"
             )
 
         # Configurar Gemini
