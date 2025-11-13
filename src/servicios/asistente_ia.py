@@ -5,13 +5,16 @@ Proporciona análisis inteligente de proyectos y responde preguntas contextuales
 import os
 from typing import List, Dict, Optional
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
 import google.generativeai as genai
 from models.proyecto import ProyectoSocial
 from models.evaluacion import ResultadoEvaluacion
 
 # Asegurar que las variables de entorno estén cargadas
-load_dotenv()
+# Buscar el archivo .env en la raíz del proyecto
+env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 
 class AsistenteIA:
