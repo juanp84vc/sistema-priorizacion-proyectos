@@ -235,13 +235,14 @@ def show():
         sectores_zomac = st.selectbox(
             "Alineación con Sectores Prioritarios",
             options=[
+                "Top 2 sectores prioritarios ZOMAC/PDET",
+                "Top 3 sectores ZOMAC/PDET",
                 "Top 4 sectores ZOMAC/PDET",
-                "Sectores estratégicos nacionales",
-                "Sectores regionales prioritarios",
-                "Otros sectores"
+                "Requiere esfuerzos de alineación",
+                "No ZOMAC/PDET o no se alinea"
             ],
-            index=0,
-            help="Indica si el proyecto está en los sectores prioritarios de ZOMAC/PDET"
+            index=2,
+            help="Indica el nivel de alineación del proyecto con sectores prioritarios ZOMAC/PDET"
         )
 
         st.markdown("---")

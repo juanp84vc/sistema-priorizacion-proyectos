@@ -124,13 +124,17 @@ class ProbabilidadAprobacionCriterio(CriterioEvaluacion):
 
         # INTEGRACIÓN DE CAMPOS CUALITATIVOS
         # Ajuste por Alineación con Sectores Prioritarios ZOMAC/PDET
-        sectores = proyecto.indicadores_impacto.get('sectores_zomac', 'Otros sectores')
-        if sectores == 'Top 4 sectores ZOMAC/PDET':
-            score *= 1.25  # 25% bonus por máxima prioridad gubernamental
-        elif sectores == 'Sectores estratégicos nacionales':
-            score *= 1.15  # 15% bonus por prioridad nacional
-        elif sectores == 'Sectores regionales prioritarios':
-            score *= 1.08  # 8% bonus por prioridad regional
+        sectores = proyecto.indicadores_impacto.get('sectores_zomac', 'Top 4 sectores ZOMAC/PDET')
+        if sectores == 'Top 2 sectores prioritarios ZOMAC/PDET':
+            score *= 1.30  # 30% bonus por máxima prioridad (Top 2)
+        elif sectores == 'Top 3 sectores ZOMAC/PDET':
+            score *= 1.25  # 25% bonus por alta prioridad (Top 3)
+        elif sectores == 'Top 4 sectores ZOMAC/PDET':
+            score *= 1.20  # 20% bonus por prioridad (Top 4)
+        elif sectores == 'Requiere esfuerzos de alineación':
+            score *= 0.95  # 5% penalización por necesitar alineación
+        elif sectores == 'No ZOMAC/PDET o no se alinea':
+            score *= 0.85  # 15% penalización por no alineación
 
         return min(max(score, 0), 100)
 
