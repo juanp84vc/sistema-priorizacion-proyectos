@@ -8,6 +8,17 @@ from servicios.asistente_ia import AsistenteIA
 def show():
     """Muestra la página del Asistente IA."""
     st.markdown("### 🤖 Asistente IA - Análisis Inteligente de Proyectos")
+
+    # Botón para reinicializar el asistente (útil si se actualizó el .env)
+    col1, col2 = st.columns([6, 1])
+    with col2:
+        if st.button("🔄 Reiniciar", help="Recarga la configuración del asistente"):
+            if 'asistente_ia' in st.session_state:
+                del st.session_state.asistente_ia
+            if 'chat_history' in st.session_state:
+                del st.session_state.chat_history
+            st.rerun()
+
     st.markdown("---")
 
     # Inicializar asistente en session_state
@@ -22,8 +33,12 @@ def show():
             1. Obtén tu API key en: https://aistudio.google.com/app/apikey
             2. Edita el archivo `.env` en la raíz del proyecto
             3. Reemplaza `YOUR_ACTUAL_API_KEY_HERE` con tu API key real
-            4. Reinicia la aplicación
+            4. Haz clic en el botón "🔄 Reiniciar" arriba
             """)
+            return
+        except Exception as e:
+            st.error(f"❌ Error inesperado: {str(e)}")
+            st.code(str(e))
             return
 
     asistente = st.session_state.asistente_ia
