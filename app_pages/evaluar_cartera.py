@@ -398,7 +398,10 @@ def show():
                 # Obtener el proyecto completo
                 proyecto_completo = next((p for p in proyectos_eval if p.id == resultado.proyecto_id), None)
 
-                if proyecto_completo:
+                if not proyecto_completo:
+                    st.warning(f"⚠️ No se pudo encontrar el proyecto con ID: {resultado.proyecto_id}")
+                    st.info(f"Proyectos disponibles: {[p.id for p in proyectos_eval]}")
+                else:
                     try:
                         # Crear recomendador
                         recomendador = RecomendadorProyectos()
