@@ -410,9 +410,10 @@ def show():
                         )
 
                         # Score potencial
+                        # Usar argumentos nombrados para evitar confusión
                         score_potencial, mensaje_potencial = recomendador.generar_score_potencial(
-                            proyecto_completo,
-                            resultado.score_final
+                            proyecto=proyecto_completo,
+                            score_actual=resultado.score_final
                         )
 
                         # Mostrar score potencial
