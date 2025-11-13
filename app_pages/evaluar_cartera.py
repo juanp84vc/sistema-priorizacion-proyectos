@@ -12,10 +12,10 @@ if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
 from criterios import (
-    ImpactoSocialCriterio,
-    SostenibilidadFinancieraCriterio,
-    AlineacionODSCriterio,
-    CapacidadOrganizacionalCriterio
+    CostoEfectividadCriterio,
+    ContribucionStakeholdersCriterio,
+    ProbabilidadAprobacionCriterio,
+    RiesgosCriterio
 )
 from estrategias import ScoringPonderado, ScoringUmbral
 from servicios import SistemaPriorizacionProyectos, ExportadorResultados
@@ -89,43 +89,43 @@ def show():
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        peso_impacto = st.slider(
-            "Impacto Social",
+        peso_costo = st.slider(
+            "Costo-Efectividad",
             min_value=0.0,
             max_value=1.0,
-            value=st.session_state.configuracion['criterios']['impacto_social'],
+            value=st.session_state.configuracion['criterios']['costo_efectividad'],
             step=0.05
         )
 
     with col2:
-        peso_sostenibilidad = st.slider(
-            "Sostenibilidad",
+        peso_stakeholders = st.slider(
+            "Stakeholders",
             min_value=0.0,
             max_value=1.0,
-            value=st.session_state.configuracion['criterios']['sostenibilidad'],
+            value=st.session_state.configuracion['criterios']['stakeholders'],
             step=0.05
         )
 
     with col3:
-        peso_ods = st.slider(
-            "Alineación ODS",
+        peso_probabilidad = st.slider(
+            "Prob. Aprobación",
             min_value=0.0,
             max_value=1.0,
-            value=st.session_state.configuracion['criterios']['alineacion_ods'],
+            value=st.session_state.configuracion['criterios']['probabilidad_aprobacion'],
             step=0.05
         )
 
     with col4:
-        peso_capacidad = st.slider(
-            "Capacidad Org.",
+        peso_riesgos = st.slider(
+            "Riesgos",
             min_value=0.0,
             max_value=1.0,
-            value=st.session_state.configuracion['criterios']['capacidad_org'],
+            value=st.session_state.configuracion['criterios']['riesgos'],
             step=0.05
         )
 
     # Validar suma de pesos
-    suma_pesos = peso_impacto + peso_sostenibilidad + peso_ods + peso_capacidad
+    suma_pesos = peso_costo + peso_stakeholders + peso_probabilidad + peso_riesgos
 
     if abs(suma_pesos - 1.0) > 0.01:
         st.error(f"❌ La suma de pesos debe ser 1.0. Actual: {suma_pesos:.2f}")
@@ -140,46 +140,46 @@ def show():
             col1, col2, col3, col4 = st.columns(4)
 
             with col1:
-                umbral_impacto = st.number_input(
-                    "Impacto Social",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=35.0,
-                    step=5.0
-                )
-
-            with col2:
-                umbral_sostenibilidad = st.number_input(
-                    "Sostenibilidad",
+                umbral_costo = st.number_input(
+                    "Costo-Efectividad",
                     min_value=0.0,
                     max_value=100.0,
                     value=40.0,
                     step=5.0
                 )
 
-            with col3:
-                umbral_ods = st.number_input(
-                    "Alineación ODS",
-                    min_value=0.0,
-                    max_value=100.0,
-                    value=30.0,
-                    step=5.0
-                )
-
-            with col4:
-                umbral_capacidad = st.number_input(
-                    "Capacidad Org.",
+            with col2:
+                umbral_stakeholders = st.number_input(
+                    "Stakeholders",
                     min_value=0.0,
                     max_value=100.0,
                     value=35.0,
                     step=5.0
                 )
 
+            with col3:
+                umbral_probabilidad = st.number_input(
+                    "Prob. Aprobación",
+                    min_value=0.0,
+                    max_value=100.0,
+                    value=45.0,
+                    step=5.0
+                )
+
+            with col4:
+                umbral_riesgos = st.number_input(
+                    "Riesgos",
+                    min_value=0.0,
+                    max_value=100.0,
+                    value=60.0,
+                    step=5.0
+                )
+
             umbrales = {
-                "Impacto Social": umbral_impacto,
-                "Sostenibilidad Financiera": umbral_sostenibilidad,
-                "Alineación ODS": umbral_ods,
-                "Capacidad Organizacional": umbral_capacidad
+                "Relación Costo-Efectividad": umbral_costo,
+                "Contribución al Relacionamiento con Stakeholders": umbral_stakeholders,
+                "Probabilidad de Aprobación Gubernamental": umbral_probabilidad,
+                "Evaluación de Riesgos": umbral_riesgos
             }
 
     # Botón evaluar
@@ -192,13 +192,10 @@ def show():
 
         # Crear criterios
         criterios = [
-            ImpactoSocialCriterio(peso=peso_impacto),
-            SostenibilidadFinancieraCriterio(peso=peso_sostenibilidad),
-            AlineacionODSCriterio(
-                ods_prioritarios=st.session_state.configuracion['ods_prioritarios'],
-                peso=peso_ods
-            ),
-            CapacidadOrganizacionalCriterio(peso=peso_capacidad)
+            CostoEfectividadCriterio(peso=peso_costo),
+            ContribucionStakeholdersCriterio(peso=peso_stakeholders),
+            ProbabilidadAprobacionCriterio(peso=peso_probabilidad),
+            RiesgosCriterio(peso=peso_riesgos)
         ]
 
         # Crear estrategia

@@ -1,14 +1,14 @@
 """Criterios de evaluación de proyectos"""
 from criterios.base import CriterioEvaluacion
-from criterios.impacto_social import ImpactoSocialCriterio
-from criterios.sostenibilidad import SostenibilidadFinancieraCriterio
-from criterios.alineacion_ods import AlineacionODSCriterio
-from criterios.capacidad_organizacional import CapacidadOrganizacionalCriterio
+from criterios.costo_efectividad import CostoEfectividadCriterio
+from criterios.stakeholders import ContribucionStakeholdersCriterio
+from criterios.probabilidad_aprobacion import ProbabilidadAprobacionCriterio
+from criterios.riesgos import RiesgosCriterio
 
 __all__ = [
     'CriterioEvaluacion',
-    'ImpactoSocialCriterio',
-    'SostenibilidadFinancieraCriterio',
-    'AlineacionODSCriterio',
-    'CapacidadOrganizacionalCriterio'
+    'CostoEfectividadCriterio',
+    'ContribucionStakeholdersCriterio',
+    'ProbabilidadAprobacionCriterio',
+    'RiesgosCriterio'
 ]

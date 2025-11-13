@@ -84,10 +84,10 @@ if 'db_initialized' not in st.session_state:
 if 'configuracion' not in st.session_state:
     st.session_state.configuracion = {
         'criterios': {
-            'impacto_social': 0.4,
-            'sostenibilidad': 0.3,
-            'alineacion_ods': 0.2,
-            'capacidad_org': 0.1
+            'costo_efectividad': 0.25,
+            'stakeholders': 0.25,
+            'probabilidad_aprobacion': 0.25,
+            'riesgos': 0.25
         },
         'ods_prioritarios': ['ODS 1', 'ODS 2', 'ODS 3', 'ODS 4', 'ODS 5'],
         'estrategia': 'ponderado'

@@ -18,46 +18,46 @@ def show():
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        peso_impacto = st.slider(
-            "Impacto Social",
+        peso_costo = st.slider(
+            "Costo-Efectividad",
             min_value=0.0,
             max_value=1.0,
-            value=st.session_state.configuracion['criterios']['impacto_social'],
+            value=st.session_state.configuracion['criterios']['costo_efectividad'],
             step=0.05,
-            key="config_impacto"
+            key="config_costo"
         )
 
     with col2:
-        peso_sostenibilidad = st.slider(
-            "Sostenibilidad",
+        peso_stakeholders = st.slider(
+            "Stakeholders",
             min_value=0.0,
             max_value=1.0,
-            value=st.session_state.configuracion['criterios']['sostenibilidad'],
+            value=st.session_state.configuracion['criterios']['stakeholders'],
             step=0.05,
-            key="config_sostenibilidad"
+            key="config_stakeholders"
         )
 
     with col3:
-        peso_ods = st.slider(
-            "Alineación ODS",
+        peso_probabilidad = st.slider(
+            "Prob. Aprobación",
             min_value=0.0,
             max_value=1.0,
-            value=st.session_state.configuracion['criterios']['alineacion_ods'],
+            value=st.session_state.configuracion['criterios']['probabilidad_aprobacion'],
             step=0.05,
-            key="config_ods"
+            key="config_probabilidad"
         )
 
     with col4:
-        peso_capacidad = st.slider(
-            "Capacidad Org.",
+        peso_riesgos = st.slider(
+            "Riesgos",
             min_value=0.0,
             max_value=1.0,
-            value=st.session_state.configuracion['criterios']['capacidad_org'],
+            value=st.session_state.configuracion['criterios']['riesgos'],
             step=0.05,
-            key="config_capacidad"
+            key="config_riesgos"
         )
 
-    suma_pesos = peso_impacto + peso_sostenibilidad + peso_ods + peso_capacidad
+    suma_pesos = peso_costo + peso_stakeholders + peso_probabilidad + peso_riesgos
 
     if abs(suma_pesos - 1.0) > 0.01:
         st.error(f"❌ La suma de pesos debe ser 1.0. Actual: {suma_pesos:.2f}")
@@ -121,10 +121,10 @@ def show():
     with col1:
         if st.button("💾 Guardar Configuración", type="primary", use_container_width=True):
             # Guardar en session state
-            st.session_state.configuracion['criterios']['impacto_social'] = peso_impacto
-            st.session_state.configuracion['criterios']['sostenibilidad'] = peso_sostenibilidad
-            st.session_state.configuracion['criterios']['alineacion_ods'] = peso_ods
-            st.session_state.configuracion['criterios']['capacidad_org'] = peso_capacidad
+            st.session_state.configuracion['criterios']['costo_efectividad'] = peso_costo
+            st.session_state.configuracion['criterios']['stakeholders'] = peso_stakeholders
+            st.session_state.configuracion['criterios']['probabilidad_aprobacion'] = peso_probabilidad
+            st.session_state.configuracion['criterios']['riesgos'] = peso_riesgos
             st.session_state.configuracion['ods_prioritarios'] = ods_prioritarios
             st.session_state.configuracion['estrategia'] = estrategia_default
 
@@ -134,10 +134,10 @@ def show():
         if st.button("🔄 Restaurar Valores por Defecto", use_container_width=True):
             st.session_state.configuracion = {
                 'criterios': {
-                    'impacto_social': 0.4,
-                    'sostenibilidad': 0.3,
-                    'alineacion_ods': 0.2,
-                    'capacidad_org': 0.1
+                    'costo_efectividad': 0.25,
+                    'stakeholders': 0.25,
+                    'probabilidad_aprobacion': 0.25,
+                    'riesgos': 0.25
                 },
                 'ods_prioritarios': ['ODS 1', 'ODS 2', 'ODS 3', 'ODS 4', 'ODS 5'],
                 'estrategia': 'ponderado'
@@ -173,10 +173,10 @@ def show():
 
         #### Criterios de Evaluación
 
-        1. **Impacto Social**: Evalúa beneficiarios, alcance geográfico y duración
-        2. **Sostenibilidad Financiera**: Analiza diversificación de fondos e ingresos propios
-        3. **Alineación ODS**: Mide contribución a Objetivos de Desarrollo Sostenible
-        4. **Capacidad Organizacional**: Evalúa experiencia, equipo y trayectoria
+        1. **Relación Costo-Efectividad**: Evalúa la relación cuantitativa entre beneficios y costo unitario
+        2. **Contribución Stakeholders**: Mide contribución al relacionamiento con stakeholders locales y viabilidad operativa
+        3. **Probabilidad de Aprobación**: Evalúa probabilidad de aprobación por parte del gobierno (nacional, distrital o local)
+        4. **Evaluación de Riesgos**: Analiza riesgos tecnológicos, regulatorios, financieros, sociales y operativos
 
         #### Estrategias de Evaluación
 
