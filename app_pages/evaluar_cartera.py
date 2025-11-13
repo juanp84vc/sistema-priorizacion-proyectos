@@ -306,32 +306,26 @@ def show():
         resultados_detallados = [sistema.evaluar_proyecto(p) for p in proyectos_eval]
 
         for resultado in resultados_detallados:
-            with st.expander(f"**{resultado.proyecto_nombre}** - Score: {formatear_numero(resultado.score_final)}"):
-                col1, col2 = st.columns([2, 1])
+            # Determinar color del score
+            score_color = "🟢" if resultado.score_final >= 80 else "🟡" if resultado.score_final >= 60 else "🔴"
 
-                with col1:
-                    st.markdown(f"**Recomendación:** {resultado.recomendacion}")
+            with st.expander(f"{score_color} **{resultado.proyecto_nombre}** - Score: {formatear_numero(resultado.score_final)}"):
+                # Header con score prominente
+                col_header1, col_header2 = st.columns([1, 2])
 
-                    # Desglose por criterio
-                    st.markdown("**Desglose por Criterio:**")
+                with col_header1:
+                    # Score final grande y prominente
+                    score_color_class = "#22c55e" if resultado.score_final >= 80 else "#eab308" if resultado.score_final >= 60 else "#ef4444"
+                    st.markdown(f"""
+                    <div style='text-align: center; padding: 20px; background-color: #f0f2f6; border-radius: 10px;'>
+                        <h4 style='margin: 0; color: #4b5563;'>Puntaje Final</h4>
+                        <h1 style='margin: 10px 0; color: {score_color_class}; font-size: 4em;'>{formatear_numero(resultado.score_final, 1)}</h1>
+                        <p style='margin: 0; color: #6b7280;'>{resultado.recomendacion}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                    for criterio, detalle in resultado.detalle_criterios.items():
-                        col_a, col_b, col_c = st.columns(3)
-
-                        with col_a:
-                            st.metric(
-                                criterio,
-                                formatear_numero(detalle['score_base'], 1)
-                            )
-
-                        with col_b:
-                            st.caption(f"Peso: {formatear_numero(detalle['peso'] * 100, 1)}%")
-
-                        with col_c:
-                            st.caption(f"Ponderado: {formatear_numero(detalle['score_ponderado'])}")
-
-                with col2:
-                    # Gráfico radar del proyecto
+                with col_header2:
+                    # Gráfico radar prominente
                     criterios_nombres = list(resultado.detalle_criterios.keys())
                     scores = [resultado.detalle_criterios[c]['score_base'] for c in criterios_nombres]
 
@@ -341,22 +335,61 @@ def show():
                         r=scores,
                         theta=criterios_nombres,
                         fill='toself',
-                        name=resultado.proyecto_nombre
+                        name=resultado.proyecto_nombre,
+                        fillcolor='rgba(59, 130, 246, 0.5)',
+                        line=dict(color='rgb(59, 130, 246)', width=2)
                     ))
 
                     fig_radar.update_layout(
-                        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                        polar=dict(
+                            radialaxis=dict(
+                                visible=True,
+                                range=[0, 100],
+                                showticklabels=True,
+                                ticks='outside'
+                            )
+                        ),
                         showlegend=False,
-                        height=300
+                        height=350,
+                        margin=dict(l=80, r=80, t=40, b=40)
                     )
 
                     st.plotly_chart(fig_radar, use_container_width=True)
 
+                st.markdown("---")
+
+                # Desglose por criterio con mejor visualización
+                st.markdown("#### 📊 Desglose Detallado por Criterio")
+
+                for criterio, detalle in resultado.detalle_criterios.items():
+                    col_a, col_b, col_c = st.columns([2, 1, 1])
+
+                    with col_a:
+                        # Barra de progreso visual
+                        score_pct = detalle['score_base']
+                        st.markdown(f"**{criterio}**")
+                        st.progress(score_pct / 100)
+
+                    with col_b:
+                        st.metric(
+                            "Score Base",
+                            formatear_numero(detalle['score_base'], 1),
+                            help=f"Score sin ponderar (0-100)"
+                        )
+
+                    with col_c:
+                        st.metric(
+                            f"Ponderado ({formatear_numero(detalle['peso'] * 100, 0)}%)",
+                            formatear_numero(detalle['score_ponderado'], 2),
+                            help=f"Score multiplicado por peso ({formatear_numero(detalle['peso'] * 100, 1)}%)"
+                        )
+
                 # Observaciones
                 if resultado.observaciones:
-                    st.markdown("**Observaciones:**")
+                    st.markdown("---")
+                    st.markdown("#### 💡 Observaciones")
                     for obs in resultado.observaciones:
-                        st.caption(f"• {obs}")
+                        st.info(f"• {obs}")
 
         # Botón para exportar
         st.markdown("---")
