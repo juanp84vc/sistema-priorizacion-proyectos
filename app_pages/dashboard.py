@@ -49,7 +49,7 @@ def show():
     # Métricas principales
     st.markdown("### 📊 Métricas Generales")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
         st.metric(
@@ -76,6 +76,27 @@ def show():
         st.metric(
             "Costo Promedio/Beneficiario",
             f"${formatear_numero(costo_promedio)}"
+        )
+
+    with col5:
+        # Calcular SROI promedio del portafolio
+        sroi_total = 0
+        proyectos_con_sroi = 0
+        for p in proyectos:
+            sroi_valor = p.indicadores_impacto.get('sroi', 0.0)
+            try:
+                sroi_num = float(sroi_valor) if sroi_valor else 0.0
+                if sroi_num > 0:
+                    sroi_total += sroi_num
+                    proyectos_con_sroi += 1
+            except (ValueError, TypeError):
+                pass
+
+        sroi_promedio = sroi_total / proyectos_con_sroi if proyectos_con_sroi > 0 else 0
+        st.metric(
+            "SROI Promedio Portfolio",
+            f"{formatear_numero(sroi_promedio, 1)}:1" if sroi_promedio > 0 else "N/A",
+            help=f"Retorno Social de la Inversión promedio de {proyectos_con_sroi} proyectos"
         )
 
     st.markdown("---")
@@ -255,6 +276,83 @@ def show():
 
         st.plotly_chart(fig_eficiencia, use_container_width=True)
 
+    # SROI por proyecto
+    st.markdown("---")
+    st.markdown("### 📈 Retorno Social de la Inversión (SROI)")
+
+    # Filtrar proyectos con SROI
+    proyectos_sroi = []
+    for p in proyectos:
+        sroi_valor = p.indicadores_impacto.get('sroi', 0.0)
+        try:
+            sroi_num = float(sroi_valor) if sroi_valor else 0.0
+            if sroi_num > 0:
+                proyectos_sroi.append({
+                    'Proyecto': p.nombre[:30] + '...' if len(p.nombre) > 30 else p.nombre,
+                    'SROI': sroi_num
+                })
+        except (ValueError, TypeError):
+            pass
+
+    if proyectos_sroi:
+        df_sroi = pd.DataFrame(proyectos_sroi)
+        df_sroi = df_sroi.sort_values('SROI', ascending=True)
+
+        fig_sroi = px.bar(
+            df_sroi,
+            x='SROI',
+            y='Proyecto',
+            orientation='h',
+            title='Retorno Social por Proyecto (mayor es mejor)',
+            color='SROI',
+            color_continuous_scale='Greens',
+            text='SROI'
+        )
+
+        fig_sroi.update_traces(
+            texttemplate='%{text:.1f}:1',
+            textposition='outside'
+        )
+
+        fig_sroi.update_layout(
+            xaxis_title='SROI (retorno por cada peso invertido)',
+            yaxis_title='Proyecto',
+            showlegend=False
+        )
+
+        st.plotly_chart(fig_sroi, use_container_width=True)
+
+        # Análisis del SROI
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            sroi_max = max([p['SROI'] for p in proyectos_sroi])
+            proyecto_max = next(p for p in proyectos_sroi if p['SROI'] == sroi_max)
+            st.metric(
+                "Mayor SROI",
+                f"{formatear_numero(sroi_max, 1)}:1",
+                help=f"Proyecto: {proyecto_max['Proyecto']}"
+            )
+
+        with col2:
+            sroi_min = min([p['SROI'] for p in proyectos_sroi])
+            proyecto_min = next(p for p in proyectos_sroi if p['SROI'] == sroi_min)
+            st.metric(
+                "Menor SROI",
+                f"{formatear_numero(sroi_min, 1)}:1",
+                help=f"Proyecto: {proyecto_min['Proyecto']}"
+            )
+
+        with col3:
+            sroi_acumulado = sum([p['SROI'] for p in proyectos_sroi])
+            st.metric(
+                "SROI Acumulado Portfolio",
+                f"{formatear_numero(sroi_acumulado, 1)}:1",
+                help=f"Suma total del retorno social de {len(proyectos_sroi)} proyectos"
+            )
+    else:
+        st.info("No hay proyectos con SROI documentado.")
+
     # Tabla resumen
     st.markdown("---")
     st.markdown("### 📋 Tabla Resumen de Proyectos")
@@ -268,6 +366,9 @@ def show():
             'Beneficiarios': formatear_numero(p.beneficiarios_totales, 0),
             'Duración (años)': formatear_numero(p.duracion_años, 1),
             'Área': p.area_geografica.value,
+            'SROI': (lambda sroi_val: f"{formatear_numero(sroi_val, 1)}:1" if sroi_val > 0 else "N/A")(
+                float(p.indicadores_impacto.get('sroi', 0.0)) if p.indicadores_impacto.get('sroi', 0.0) else 0.0
+            ),
             'Estado': p.estado.value
         }
         for p in proyectos

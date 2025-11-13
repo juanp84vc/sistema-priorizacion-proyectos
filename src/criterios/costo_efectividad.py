@@ -88,9 +88,19 @@ class CostoEfectividadCriterio(CriterioEvaluacion):
             score *= 0.85  # 15% penalización por baja pertinencia
 
         # Ajuste por SROI (si existe y es significativo)
-        sroi = proyecto.indicadores_impacto.get('sroi', '')
-        if sroi and len(sroi) > 10:  # Si hay un análisis SROI documentado
-            score *= 1.08  # 8% bonus por tener análisis de retorno social
+        sroi = proyecto.indicadores_impacto.get('sroi', 0.0)
+        try:
+            sroi_valor = float(sroi) if sroi else 0.0
+            if sroi_valor > 0:
+                # Bonus progresivo según el SROI
+                if sroi_valor >= 5.0:
+                    score *= 1.15  # 15% bonus por SROI excelente (≥5:1)
+                elif sroi_valor >= 3.0:
+                    score *= 1.10  # 10% bonus por SROI muy bueno (≥3:1)
+                elif sroi_valor >= 2.0:
+                    score *= 1.05  # 5% bonus por SROI bueno (≥2:1)
+        except (ValueError, TypeError):
+            pass  # Si no se puede convertir, ignorar
 
         return min(max(score, 0), 100)
 

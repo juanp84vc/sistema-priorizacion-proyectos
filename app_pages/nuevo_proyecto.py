@@ -189,11 +189,13 @@ def show():
         col1, col2 = st.columns(2)
 
         with col1:
-            sroi = st.text_area(
+            sroi = st.number_input(
                 "SROI (Retorno Social de la Inversión)",
-                placeholder="Describe el retorno social esperado del proyecto...",
-                height=100,
-                help="Información cualitativa sobre el impacto social esperado por cada peso invertido"
+                min_value=0.0,
+                max_value=100.0,
+                value=0.0,
+                step=0.1,
+                help="Ratio que mide el retorno social de la inversión (ej: 3.5 significa que por cada peso invertido se generan 3.5 pesos de valor social)"
             )
 
         with col2:
@@ -291,7 +293,7 @@ def show():
                 estado=EstadoProyecto.PROPUESTA,
                 indicadores_impacto={
                     # Información cualitativa de criterios
-                    'sroi': sroi if sroi else '',
+                    'sroi': sroi if sroi > 0 else 0.0,
                     'pertinencia_operacional': pertinencia_operacional,
                     'contribucion_stakeholders': contribucion_stakeholders,
                     'sectores_zomac': sectores_zomac,
