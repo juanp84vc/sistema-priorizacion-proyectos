@@ -4,23 +4,27 @@ Soporta: Excel, CSV, Word y PDF.
 """
 import io
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import pandas as pd
+from servicios.gestor_historial import GestorHistorial
 
 
 class ExportadorResultados:
     """Clase para exportar resultados de evaluación a diferentes formatos."""
 
-    def __init__(self, reporte: Dict[str, Any], resultados_detallados: List[Any] = None):
+    def __init__(self, reporte: Dict[str, Any], resultados_detallados: List[Any] = None,
+                 gestor_historial: Optional[GestorHistorial] = None):
         """
         Inicializa el exportador con los datos del reporte.
 
         Args:
             reporte: Diccionario con el reporte completo de evaluación
             resultados_detallados: Lista opcional de resultados detallados por proyecto
+            gestor_historial: Gestor de historial para incluir trazabilidad
         """
         self.reporte = reporte
         self.resultados_detallados = resultados_detallados or []
+        self.gestor_historial = gestor_historial
         self.fecha_generacion = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     @staticmethod
@@ -240,6 +244,36 @@ class ExportadorResultados:
                     for obs in resultado.observaciones:
                         doc.add_paragraph(f"• {obs}", style='List Bullet')
 
+                # Agregar sección de trazabilidad si existe historial
+                if self.gestor_historial:
+                    historial = self.gestor_historial.obtener_historial(resultado.proyecto_id)
+                    if historial and historial.numero_versiones > 1:
+                        doc.add_heading('Trazabilidad y Versiones', 3)
+
+                        # Resumen de mejora
+                        doc.add_paragraph(
+                            f"Score Inicial: {historial.versiones[0].score_total:.1f} | "
+                            f"Score Actual: {historial.version_actual.score_total:.1f} | "
+                            f"Mejora: +{historial.mejora_total:.1f} puntos ({historial.porcentaje_mejora:.1f}%)"
+                        )
+
+                        # Versiones
+                        doc.add_paragraph(f"Número de versiones: {historial.numero_versiones}")
+
+                        # Recomendaciones implementadas
+                        recs_impl = historial.obtener_recomendaciones_implementadas()
+                        if recs_impl:
+                            doc.add_paragraph(
+                                f"Recomendaciones implementadas: {len(recs_impl)}/{len(recs_impl) + len(historial.recomendaciones_pendientes)}"
+                            )
+
+                            for rec in recs_impl[:5]:  # Mostrar solo primeras 5
+                                fecha = rec.fecha_implementacion.strftime('%d/%m/%Y') if rec.fecha_implementacion else 'N/A'
+                                doc.add_paragraph(
+                                    f"✓ [{fecha}] {rec.descripcion[:100]}...",
+                                    style='List Bullet'
+                                )
+
                 doc.add_paragraph()
 
         # Guardar en BytesIO
@@ -412,6 +446,40 @@ class ExportadorResultados:
                     story.append(Paragraph("<b>Observaciones:</b>", styles['Normal']))
                     for obs in resultado.observaciones:
                         story.append(Paragraph(f"• {obs}", styles['Normal']))
+
+                # Agregar sección de trazabilidad si existe historial
+                if self.gestor_historial:
+                    historial = self.gestor_historial.obtener_historial(resultado.proyecto_id)
+                    if historial and historial.numero_versiones > 1:
+                        story.append(Spacer(1, 0.15 * inch))
+                        story.append(Paragraph("<b>Trazabilidad y Versiones</b>", styles['Heading4']))
+
+                        # Resumen de mejora
+                        story.append(Paragraph(
+                            f"<b>Score Inicial:</b> {historial.versiones[0].score_total:.1f} | "
+                            f"<b>Score Actual:</b> {historial.version_actual.score_total:.1f} | "
+                            f"<b>Mejora:</b> +{historial.mejora_total:.1f} puntos ({historial.porcentaje_mejora:.1f}%)",
+                            styles['Normal']
+                        ))
+                        story.append(Paragraph(
+                            f"<b>Número de versiones:</b> {historial.numero_versiones}",
+                            styles['Normal']
+                        ))
+
+                        # Recomendaciones implementadas
+                        recs_impl = historial.obtener_recomendaciones_implementadas()
+                        if recs_impl:
+                            story.append(Paragraph(
+                                f"<b>Recomendaciones implementadas:</b> {len(recs_impl)}/{len(recs_impl) + len(historial.recomendaciones_pendientes)}",
+                                styles['Normal']
+                            ))
+
+                            for rec in recs_impl[:5]:  # Mostrar solo primeras 5
+                                fecha = rec.fecha_implementacion.strftime('%d/%m/%Y') if rec.fecha_implementacion else 'N/A'
+                                story.append(Paragraph(
+                                    f"✓ [{fecha}] {rec.descripcion[:80]}...",
+                                    styles['Normal']
+                                ))
 
         # Generar PDF
         doc.build(story)

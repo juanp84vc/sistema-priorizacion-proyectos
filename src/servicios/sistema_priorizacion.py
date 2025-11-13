@@ -3,11 +3,13 @@ Sistema principal de priorización de proyectos.
 SRP: Orquesta evaluación, no implementa lógica de criterios.
 DIP: Depende de abstracciones (CriterioEvaluacion, EstrategiaEvaluacion).
 """
-from typing import List
+from typing import List, Optional
 from models.proyecto import ProyectoSocial
 from models.evaluacion import ResultadoEvaluacion
 from criterios.base import CriterioEvaluacion
 from estrategias.base import EstrategiaEvaluacion
+from servicios.gestor_historial import GestorHistorial
+from servicios.recomendador import RecomendadorProyectos
 
 
 class SistemaPriorizacionProyectos:
@@ -26,7 +28,8 @@ class SistemaPriorizacionProyectos:
     def __init__(
         self,
         criterios: List[CriterioEvaluacion],
-        estrategia: EstrategiaEvaluacion
+        estrategia: EstrategiaEvaluacion,
+        gestor_historial: Optional[GestorHistorial] = None
     ):
         """
         Inicializa sistema con criterios y estrategia.
@@ -34,27 +37,57 @@ class SistemaPriorizacionProyectos:
         Args:
             criterios: Lista de criterios a aplicar
             estrategia: Estrategia de evaluación a usar
+            gestor_historial: Gestor de historial para trazabilidad (opcional)
         """
         if not criterios:
             raise ValueError("Debe proporcionar al menos un criterio")
 
         self.criterios = criterios
         self.estrategia = estrategia
+        self.gestor_historial = gestor_historial or GestorHistorial()
+        self.recomendador = RecomendadorProyectos()
 
     def evaluar_proyecto(
         self,
-        proyecto: ProyectoSocial
+        proyecto: ProyectoSocial,
+        crear_historial: bool = True
     ) -> ResultadoEvaluacion:
         """
         Evalúa un proyecto individual.
 
         Args:
             proyecto: Proyecto a evaluar
+            crear_historial: Si se debe crear/actualizar historial (default: True)
 
         Returns:
             ResultadoEvaluacion con scores y recomendación
         """
-        return self.estrategia.evaluar_proyecto(proyecto, self.criterios)
+        resultado = self.estrategia.evaluar_proyecto(proyecto, self.criterios)
+
+        # Crear o actualizar historial si está habilitado
+        if crear_historial:
+            # Extraer scores por criterio
+            scores_criterios = {
+                criterio: info['score_base']
+                for criterio, info in resultado.detalle_criterios.items()
+            }
+
+            # Generar recomendaciones
+            recomendaciones = self.recomendador.analizar_proyecto(proyecto, resultado.detalle_criterios)
+
+            # Verificar si ya existe historial
+            historial_existente = self.gestor_historial.obtener_historial(proyecto.id)
+
+            if historial_existente is None:
+                # Crear historial inicial
+                self.gestor_historial.crear_historial(
+                    proyecto=proyecto,
+                    score_inicial=resultado.score_final,
+                    scores_criterios=scores_criterios,
+                    recomendaciones=recomendaciones
+                )
+
+        return resultado
 
     def priorizar_cartera(
         self,

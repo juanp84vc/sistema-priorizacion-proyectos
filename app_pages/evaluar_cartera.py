@@ -204,10 +204,12 @@ def show():
         else:
             estrategia = ScoringUmbral(umbrales_minimos=umbrales)
 
-        # Crear sistema
+        # Crear sistema (con gestor de historial)
+        gestor_historial = st.session_state.get('gestor_historial', None)
         sistema = SistemaPriorizacionProyectos(
             criterios=criterios,
-            estrategia=estrategia
+            estrategia=estrategia,
+            gestor_historial=gestor_historial
         )
 
         # Evaluar proyectos seleccionados
@@ -491,8 +493,9 @@ def show():
         st.markdown("---")
         st.markdown("### 📥 Exportar Resultados")
 
-        # Crear exportador con los datos
-        exportador = ExportadorResultados(reporte, resultados_detallados)
+        # Crear exportador con los datos (incluir gestor de historial)
+        gestor_historial = st.session_state.get('gestor_historial', None)
+        exportador = ExportadorResultados(reporte, resultados_detallados, gestor_historial)
 
         col1, col2, col3, col4 = st.columns(4)
 

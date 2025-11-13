@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Importar páginas
-from app_pages import home, nuevo_proyecto, buscar_proyectos, evaluar_cartera, dashboard, configuracion
+from app_pages import home, nuevo_proyecto, buscar_proyectos, evaluar_cartera, dashboard, configuracion, historial_proyecto
 
 # Importar gestor de base de datos
 from database.db_manager import get_db_manager
@@ -93,6 +93,11 @@ if 'configuracion' not in st.session_state:
         'estrategia': 'ponderado'
     }
 
+# Inicializar gestor de historial
+if 'gestor_historial' not in st.session_state:
+    from servicios.gestor_historial import GestorHistorial
+    st.session_state.gestor_historial = GestorHistorial()
+
 # Sidebar - Menú de navegación
 with st.sidebar:
     st.markdown("### 🎯 Sistema de Priorización")
@@ -104,7 +109,7 @@ with st.sidebar:
     menu_option = st.radio(
         "Selecciona una opción:",
         ["🏠 Inicio", "➕ Nuevo Proyecto", "🔍 Buscar y Editar",
-         "📊 Evaluar Cartera", "📈 Dashboard", "⚙️ Configuración"],
+         "📊 Evaluar Cartera", "📚 Historial", "📈 Dashboard", "⚙️ Configuración"],
         label_visibility="collapsed"
     )
 
@@ -124,6 +129,8 @@ elif menu_option == "🔍 Buscar y Editar":
     buscar_proyectos.show()
 elif menu_option == "📊 Evaluar Cartera":
     evaluar_cartera.show()
+elif menu_option == "📚 Historial":
+    historial_proyecto.show()
 elif menu_option == "📈 Dashboard":
     dashboard.show()
 elif menu_option == "⚙️ Configuración":
