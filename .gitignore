@@ -48,3 +48,6 @@ data/
 # Backups
 backups/
 *.bak
+
+# Environment variables (API keys)
+.env
