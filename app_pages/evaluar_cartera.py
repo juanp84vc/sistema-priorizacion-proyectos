@@ -18,7 +18,7 @@ from criterios import (
     RiesgosCriterio
 )
 from estrategias import ScoringPonderado, ScoringUmbral
-from servicios import SistemaPriorizacionProyectos, ExportadorResultados
+from servicios import SistemaPriorizacionProyectos, ExportadorResultados, RecomendadorProyectos
 
 
 def formatear_numero(numero: float, decimales: int = 2) -> str:
@@ -390,6 +390,86 @@ def show():
                     st.markdown("#### 💡 Observaciones")
                     for obs in resultado.observaciones:
                         st.info(f"• {obs}")
+
+                # Recomendaciones para optimizar el proyecto
+                st.markdown("---")
+                st.markdown("#### 🎯 Estrategias de Optimización del Proyecto")
+
+                # Obtener el proyecto completo
+                proyecto_completo = next((p for p in proyectos_eval if p.id == resultado.proyecto_id), None)
+
+                if proyecto_completo:
+                    # Crear recomendador
+                    recomendador = RecomendadorProyectos()
+
+                    # Generar recomendaciones
+                    recomendaciones = recomendador.analizar_proyecto(
+                        proyecto_completo,
+                        resultado.detalle_criterios
+                    )
+
+                    # Score potencial
+                    score_potencial, mensaje_potencial = recomendador.generar_score_potencial(
+                        proyecto_completo,
+                        resultado.score_final
+                    )
+
+                    # Mostrar score potencial
+                    if score_potencial > resultado.score_final:
+                        delta = score_potencial - resultado.score_final
+                        col_pot1, col_pot2 = st.columns(2)
+
+                        with col_pot1:
+                            st.metric(
+                                "Score Actual",
+                                formatear_numero(resultado.score_final, 1)
+                            )
+
+                        with col_pot2:
+                            st.metric(
+                                "Score Potencial",
+                                formatear_numero(score_potencial, 1),
+                                delta=f"+{formatear_numero(delta, 1)}",
+                                delta_color="normal"
+                            )
+
+                        st.info(f"💡 {mensaje_potencial}")
+                    else:
+                        st.success(mensaje_potencial)
+
+                    st.markdown("")
+
+                    # Tabs para categorías de recomendaciones
+                    if any(recomendaciones.values()):
+                        tabs_labels = []
+                        tabs_content = []
+
+                        if recomendaciones['criticas']:
+                            tabs_labels.append("🔴 Críticas")
+                            tabs_content.append(recomendaciones['criticas'])
+
+                        if recomendaciones['importantes']:
+                            tabs_labels.append("🟡 Importantes")
+                            tabs_content.append(recomendaciones['importantes'])
+
+                        if recomendaciones['opcionales']:
+                            tabs_labels.append("🟢 Opcionales")
+                            tabs_content.append(recomendaciones['opcionales'])
+
+                        if recomendaciones['fortalezas']:
+                            tabs_labels.append("✅ Fortalezas")
+                            tabs_content.append(recomendaciones['fortalezas'])
+
+                        if tabs_labels:
+                            tabs = st.tabs(tabs_labels)
+
+                            for i, (tab, content) in enumerate(zip(tabs, tabs_content)):
+                                with tab:
+                                    for recomendacion in content:
+                                        st.markdown(recomendacion)
+                                        st.markdown("")
+                    else:
+                        st.info("No hay recomendaciones específicas para este proyecto.")
 
         # Botón para exportar
         st.markdown("---")
