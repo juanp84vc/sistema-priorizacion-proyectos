@@ -57,40 +57,38 @@ class AsistenteIA:
         Returns:
             String con el contexto del proyecto
         """
+        # Construir ubicación legible
+        ubicacion = f"{', '.join(proyecto.departamentos)}"
+        if proyecto.municipios:
+            ubicacion += f" (Municipios: {', '.join(proyecto.municipios)})"
+
         contexto = f"""
 ## Información del Proyecto: {proyecto.nombre}
 
 **Datos Generales:**
 - ID: {proyecto.id}
+- Organización: {proyecto.organizacion}
 - Descripción: {proyecto.descripcion}
-- Ubicación: {proyecto.ubicacion}
-- Duración: {proyecto.duracion_meses} meses
-- ODS Principales: {', '.join(proyecto.ods_principales)}
+- Ubicación: {ubicacion}
+- Área Geográfica: {proyecto.area_geografica.value}
+- Población Objetivo: {proyecto.poblacion_objetivo}
+- Duración: {proyecto.duracion_meses} meses ({proyecto.duracion_años:.1f} años)
+- ODS Vinculados: {', '.join(proyecto.ods_vinculados)}
+- Estado: {proyecto.estado.value}
 
-**Financiamiento:**
+**Financiamiento y Beneficiarios:**
 - Presupuesto Total: ${proyecto.presupuesto_total:,.0f}
-- Beneficiarios Directos: {proyecto.beneficiarios_directos}
-- Costo por Beneficiario: ${proyecto.presupuesto_por_beneficiario:,.0f}
-- SROI: {proyecto.sroi}:1
-
-**Ubicación Prioritaria:**
-- Municipio ZOMAC/PDET: {proyecto.municipio_zomac_pdet}
-- Prioridad: {proyecto.prioridad_zomac_pdet}
-
-**Stakeholders:**
-- Total de Stakeholders: {len(proyecto.stakeholders_identificados)}
-- Stakeholders Comprometidos: {len(proyecto.stakeholders_comprometidos)}
-- Listado: {', '.join(proyecto.stakeholders_identificados)}
-
-**Aprobación:**
-- Probabilidad de Aprobación: {proyecto.probabilidad_aprobacion}%
-- Cumplimiento Regulatorio: {proyecto.cumplimiento_requisitos_regulatorios}%
-
-**Riesgos:**
-- Riesgos Identificados: {proyecto.numero_riesgos_identificados}
-- Planes de Mitigación: {proyecto.planes_mitigacion_documentados}
-- Gravedad Promedio: {proyecto.gravedad_riesgos_promedio}/5
+- Beneficiarios Directos: {proyecto.beneficiarios_directos:,}
+- Beneficiarios Indirectos: {proyecto.beneficiarios_indirectos:,}
+- Beneficiarios Totales: {proyecto.beneficiarios_totales:,}
+- Costo por Beneficiario: ${proyecto.presupuesto_por_beneficiario:,.2f}
 """
+
+        # Agregar indicadores de impacto si existen
+        if proyecto.indicadores_impacto:
+            contexto += "\n**Indicadores de Impacto:**\n"
+            for indicador, valor in proyecto.indicadores_impacto.items():
+                contexto += f"- {indicador}: {valor}\n"
 
         # Agregar resultado de evaluación si existe
         if resultado:
@@ -134,11 +132,17 @@ class AsistenteIA:
             if resultados and i-1 < len(resultados):
                 score_info = f" | Score: {resultados[i-1].score_final:.1f}"
 
+            # Construir ubicación legible
+            ubicacion = ', '.join(proyecto.departamentos)
+            if proyecto.municipios:
+                ubicacion += f" ({len(proyecto.municipios)} municipios)"
+
             contexto += f"""
 {i}. **{proyecto.nombre}**
-   - Ubicación: {proyecto.ubicacion}
+   - Organización: {proyecto.organizacion}
+   - Ubicación: {ubicacion}
    - Presupuesto: ${proyecto.presupuesto_total:,.0f}
-   - Beneficiarios: {proyecto.beneficiarios_directos}
+   - Beneficiarios: {proyecto.beneficiarios_totales:,}
    - Duración: {proyecto.duracion_meses} meses{score_info}
 """
 
