@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Importar páginas
-from app_pages import home, nuevo_proyecto, evaluar_cartera, dashboard, configuracion
+from app_pages import home, nuevo_proyecto, buscar_proyectos, evaluar_cartera, dashboard, configuracion
 
 # Configuración de la página
 st.set_page_config(
@@ -87,8 +87,8 @@ with st.sidebar:
 
     menu_option = st.radio(
         "Selecciona una opción:",
-        ["🏠 Inicio", "➕ Nuevo Proyecto", "📊 Evaluar Cartera",
-         "📈 Dashboard", "⚙️ Configuración"],
+        ["🏠 Inicio", "➕ Nuevo Proyecto", "🔍 Buscar y Editar",
+         "📊 Evaluar Cartera", "📈 Dashboard", "⚙️ Configuración"],
         label_visibility="collapsed"
     )
 
@@ -104,6 +104,8 @@ if menu_option == "🏠 Inicio":
     home.show()
 elif menu_option == "➕ Nuevo Proyecto":
     nuevo_proyecto.show()
+elif menu_option == "🔍 Buscar y Editar":
+    buscar_proyectos.show()
 elif menu_option == "📊 Evaluar Cartera":
     evaluar_cartera.show()
 elif menu_option == "📈 Dashboard":
