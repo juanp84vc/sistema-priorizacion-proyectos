@@ -41,10 +41,11 @@ class AsistenteIA:
         print(f"DEBUG - Ruta .env: {env_path}")
         print(f"DEBUG - .env existe: {env_path.exists()}")
 
-        if not self.api_key or self.api_key == 'YOUR_ACTUAL_API_KEY_HERE':
+        # Validación simplificada - si no hay API key, dejamos que Gemini lance el error
+        if not self.api_key:
             raise ValueError(
-                "API key de Google Gemini no configurada. "
-                "Por favor, configura GOOGLE_API_KEY en el archivo .env"
+                "API key de Google Gemini no encontrada en variables de entorno. "
+                f"Verifica que el archivo {env_path} existe y contiene GOOGLE_API_KEY"
             )
 
         # Configurar Gemini
