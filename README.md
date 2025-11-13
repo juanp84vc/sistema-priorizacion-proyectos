@@ -24,10 +24,10 @@ pip install -r requirements.txt
 ```python
 from src.models.proyecto import ProyectoSocial, AreaGeografica, EstadoProyecto
 from src.criterios import (
-    ImpactoSocialCriterio,
-    SostenibilidadFinancieraCriterio,
-    AlineacionODSCriterio,
-    CapacidadOrganizacionalCriterio
+    CostoEfectividadCriterio,
+    ContribucionStakeholdersCriterio,
+    ProbabilidadAprobacionCriterio,
+    RiesgosCriterio
 )
 from src.estrategias.scoring_ponderado import ScoringPonderado
 from src.servicios.sistema_priorizacion import SistemaPriorizacionProyectos
@@ -35,10 +35,10 @@ from src.servicios.sistema_priorizacion import SistemaPriorizacionProyectos
 # Configurar sistema
 sistema = SistemaPriorizacionProyectos(
     criterios=[
-        ImpactoSocialCriterio(peso=0.4),
-        SostenibilidadFinancieraCriterio(peso=0.3),
-        AlineacionODSCriterio(["ODS 1", "ODS 4", "ODS 10"], peso=0.2),
-        CapacidadOrganizacionalCriterio(peso=0.1)
+        CostoEfectividadCriterio(peso=0.25),
+        ContribucionStakeholdersCriterio(peso=0.25),
+        ProbabilidadAprobacionCriterio(peso=0.25),
+        RiesgosCriterio(peso=0.25)
     ],
     estrategia=ScoringPonderado()
 )
@@ -55,10 +55,10 @@ for resultado in resultados:
 
 ### Single Responsibility Principle (SRP)
 Cada criterio tiene UNA sola responsabilidad:
-- `ImpactoSocialCriterio`: Solo evalúa impacto social
-- `SostenibilidadCriterio`: Solo evalúa sostenibilidad financiera
-- `AlineacionODSCriterio`: Solo evalúa alineación con ODS
-- `CapacidadOrganizacionalCriterio`: Solo evalúa capacidad de ejecución
+- `CostoEfectividadCriterio`: Solo evalúa relación costo-efectividad
+- `ContribucionStakeholdersCriterio`: Solo evalúa contribución a stakeholders
+- `ProbabilidadAprobacionCriterio`: Solo evalúa probabilidad de aprobación gubernamental
+- `RiesgosCriterio`: Solo evalúa riesgos del proyecto
 
 ### Open/Closed Principle (OCP)
 Extensible sin modificación:
@@ -101,10 +101,10 @@ sistema-priorizacion-proyectos/
 │   │   └── evaluacion.py    # ResultadoEvaluacion
 │   ├── criterios/           # Criterios de evaluación
 │   │   ├── base.py          # Abstracción base (DIP)
-│   │   ├── impacto_social.py
-│   │   ├── sostenibilidad.py
-│   │   ├── alineacion_ods.py
-│   │   └── capacidad_organizacional.py
+│   │   ├── costo_efectividad.py
+│   │   ├── stakeholders.py
+│   │   ├── probabilidad_aprobacion.py
+│   │   └── riesgos.py
 │   ├── estrategias/         # Estrategias de scoring
 │   │   ├── base.py
 │   │   ├── scoring_ponderado.py
@@ -120,25 +120,29 @@ sistema-priorizacion-proyectos/
 
 ## 📊 Criterios de Evaluación
 
-### 1. Impacto Social (40%)
-- Número de beneficiarios directos e indirectos
-- Área geográfica (rural tiene multiplicador)
-- Duración del proyecto
+### 1. Relación Costo-Efectividad (25%)
+- Evalúa la relación cuantitativa entre beneficios obtenidos y su costo unitario
+- Considera costo por beneficiario, eficiencia temporal y operativa
+- Metodología: Escala inversa (menor costo = mayor score)
+- Score alto indica excelente eficiencia en el uso de recursos
 
-### 2. Sostenibilidad Financiera (30%)
-- Diversificación de fuentes de financiamiento
-- Porcentaje de ingresos propios
-- Eficiencia presupuestaria (costo por beneficiario)
+### 2. Contribución al Relacionamiento con Stakeholders (25%)
+- Mide contribución al relacionamiento con stakeholders locales y viabilidad operativa
+- Considera alcance geográfico, múltiples departamentos y cobertura de beneficiarios
+- Evalúa fortalecimiento de relaciones institucionales
+- Score alto indica fuerte relacionamiento y viabilidad operativa
 
-### 3. Alineación con ODS (20%)
-- ODS prioritarios de la organización
-- Cantidad de ODS que aborda el proyecto
-- Bonus por integralidad (3+ ODS)
+### 3. Probabilidad de Aprobación Gubernamental (25%)
+- Evalúa probabilidad de aprobación por Gobierno Nacional, distrital o local
+- Niveles: **alta, media, baja**
+- Considera alineación con ODS prioritarios y viabilidad presupuestaria
+- Evalúa población objetivo prioritaria y alcance geográfico estratégico
 
-### 4. Capacidad Organizacional (10%)
-- Años de experiencia de la organización
-- Calificación del equipo
-- Proyectos exitosos previos
+### 4. Evaluación de Riesgos (25%)
+- Analiza riesgos tecnológicos, regulatorios, financieros, sociales y operativos
+- Considera complejidad presupuestaria, duración y alcance geográfico
+- Evalúa características de población objetivo
+- Score alto = bajo riesgo (escala inversa)
 
 ## 🎲 Estrategias de Scoring
 
