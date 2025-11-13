@@ -258,3 +258,4 @@ Para uso en producción, se recomienda agregar:
 - Sistema de autenticación
 - Logs y monitoreo
 - Tests de integración completos
+
