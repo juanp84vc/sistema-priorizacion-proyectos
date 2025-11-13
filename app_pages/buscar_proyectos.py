@@ -11,6 +11,7 @@ if src_path not in sys.path:
 from models.proyecto import ProyectoSocial, AreaGeografica, EstadoProyecto
 from models.municipios_colombia import obtener_municipios, obtener_todos_departamentos
 from servicios.recomendador import RecomendadorProyectos
+from database.db_manager import get_db_manager
 
 
 def formatear_numero(numero: float, decimales: int = 2) -> str:
@@ -302,7 +303,15 @@ def mostrar_formulario_edicion(proyecto, idx):
                 'ingresos_propios_pct': ingresos_propios
             }
 
-            st.success(f"✅ Proyecto '{nombre}' actualizado exitosamente!")
+            # Guardar en base de datos
+            db = get_db_manager()
+            if db.actualizar_proyecto(proyecto):
+                # Recargar proyectos desde BD
+                st.session_state.proyectos = db.obtener_todos_proyectos()
+                st.success(f"✅ Proyecto '{nombre}' actualizado exitosamente!")
+            else:
+                st.error(f"❌ Error al actualizar el proyecto en la base de datos.")
+                return False
 
             # Limpiar estado de edición
             if 'edit_departamentos' in st.session_state:

@@ -14,6 +14,9 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 # Importar páginas
 from app_pages import home, nuevo_proyecto, buscar_proyectos, evaluar_cartera, dashboard, configuracion
 
+# Importar gestor de base de datos
+from database.db_manager import get_db_manager
+
 # Configuración de la página
 st.set_page_config(
     page_title="Sistema de Priorización de Proyectos",
@@ -62,9 +65,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Inicializar base de datos
+@st.cache_resource
+def init_database():
+    """Inicializa la base de datos y retorna el gestor."""
+    return get_db_manager()
+
+db = init_database()
+
 # Inicializar session state
 if 'proyectos' not in st.session_state:
-    st.session_state.proyectos = []
+    # Cargar proyectos desde la base de datos
+    st.session_state.proyectos = db.obtener_todos_proyectos()
+
+if 'db_initialized' not in st.session_state:
+    st.session_state.db_initialized = True
+
 if 'configuracion' not in st.session_state:
     st.session_state.configuracion = {
         'criterios': {

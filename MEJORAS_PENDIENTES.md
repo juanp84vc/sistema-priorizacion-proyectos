@@ -6,7 +6,31 @@ Este documento describe las mejoras planificadas para el Sistema de Priorizació
 
 ## ✅ Mejoras Implementadas Recientemente
 
-### 1. **Sistema de Recomendaciones Personalizadas** ✅ IMPLEMENTADO
+### 1. **Persistencia de Datos con Base de Datos SQLite** ✅ IMPLEMENTADO (v1.3.0)
+Los proyectos ahora se guardan permanentemente en una base de datos SQLite:
+
+- **Base de datos persistente**: Los proyectos ya no se pierden al cerrar el navegador
+- **Gestión completa CRUD**: Crear, leer, actualizar y eliminar proyectos desde BD
+- **Historial de cambios**: Sistema de auditoría que registra todas las modificaciones
+- **Búsqueda avanzada**: Funciones de búsqueda optimizadas a nivel de BD
+- **Estadísticas**: Consultas agregadas para métricas del sistema
+- **Backups**: Funcionalidad para crear y restaurar copias de seguridad
+- **Singleton pattern**: Gestor de BD compartido en toda la aplicación
+
+**Archivos creados**:
+- `src/database/db_manager.py`: Gestor completo de base de datos
+- `src/database/__init__.py`: Módulo de BD
+- `data/proyectos.db`: Base de datos SQLite (no se sube a Git)
+- `.gitignore`: Configurado para excluir archivos de datos locales
+
+**Integración**:
+- Todas las páginas ahora usan la BD en lugar de session_state
+- Los datos persisten entre sesiones y recargas de página
+- Múltiples usuarios pueden compartir la misma base de datos
+
+**Valor añadido**: El sistema ahora es apto para producción, permitiendo trabajo colaborativo y garantizando que los datos no se pierdan.
+
+### 2. **Sistema de Recomendaciones Personalizadas** ✅ IMPLEMENTADO
 Al guardar un proyecto, el sistema analiza automáticamente los datos y genera recomendaciones categorizadas:
 
 - **Críticas**: Aspectos que deben corregirse urgentemente
@@ -23,20 +47,29 @@ El sistema también estima el score potencial del proyecto y sugiere mejoras esp
 
 **Valor añadido**: Los asesores de gerencia pueden usar estas sugerencias como guía para perfeccionar las propuestas antes de su presentación final.
 
-### 2. **Selector Dinámico de Municipios** ✅
+### 3. **Búsqueda y Edición de Proyectos** ✅ IMPLEMENTADO (v1.2.0)
+Sistema completo de búsqueda, filtrado y edición:
+
+- **Filtros avanzados**: Por texto, organización, departamento, ODS, área, estado, presupuesto
+- **Ordenamiento flexible**: Por nombre, presupuesto o beneficiarios
+- **Edición completa**: Formulario para modificar todos los campos de un proyecto
+- **Validaciones**: Prevención de errores al editar
+- **Persistencia**: Cambios guardados en base de datos
+
+### 4. **Selector Dinámico de Municipios** ✅
 - Se actualiza automáticamente según los departamentos seleccionados
 - Movido fuera del formulario para permitir actualizaciones en tiempo real
 
-### 3. **Formato de Números Correcto** ✅
+### 5. **Formato de Números Correcto** ✅
 - Aplicado en toda la interfaz: 1.234.567,89 (punto para miles, coma para decimales)
 
-### 4. **Prevención de Duplicados** ✅
+### 6. **Prevención de Duplicados** ✅
 - Validación de IDs únicos de proyectos
 
-### 5. **Botón Limpiar Formulario** ✅
+### 7. **Botón Limpiar Formulario** ✅
 - Permite restablecer todos los campos rápidamente
 
-### 6. **Exportaciones Completas** ✅
+### 8. **Exportaciones Completas** ✅
 - CSV, Excel, Word y PDF funcionando correctamente
 - Todos con formato de números correcto
 
@@ -44,38 +77,7 @@ El sistema también estima el score potencial del proyecto y sugiere mejoras esp
 
 ## 🚀 Mejoras Prioritarias (Próximos Pasos)
 
-### 1. **Persistencia de Datos con Base de Datos** 🔴 ALTA PRIORIDAD
-
-**Problema actual**: Los proyectos solo se guardan en la sesión del navegador y se pierden al cerrar o recargar.
-
-**Solución**: Implementar SQLite o PostgreSQL
-
-**Beneficios**:
-- ✅ Proyectos guardados permanentemente
-- ✅ Todo el equipo ve los mismos datos
-- ✅ Historial de cambios
-- ✅ Backups automáticos
-
-**Código base**: Ver archivo `DESPLIEGUE.md` sección "Opción 2"
-
-**Archivos a crear**:
-```
-src/database/
-  ├── db_manager.py       # Gestor de base de datos
-  ├── migrations.py       # Migraciones de esquema
-  └── backup.py          # Sistema de respaldo
-```
-
-**Tareas**:
-- [ ] Crear esquema de base de datos
-- [ ] Implementar CRUD (Create, Read, Update, Delete)
-- [ ] Migrar proyectos de session_state a BD
-- [ ] Agregar sistema de backups automáticos
-- [ ] Implementar sincronización en tiempo real
-
----
-
-### 2. **Sistema de Autenticación y Roles** 🔴 ALTA PRIORIDAD
+### 1. **Sistema de Autenticación y Roles** 🔴 ALTA PRIORIDAD
 
 **Necesidad**: Controlar quién puede crear, editar o eliminar proyectos
 
@@ -100,61 +102,7 @@ pip install streamlit-authenticator
 
 ---
 
-### 3. **Edición de Proyectos Existentes** 🟡 MEDIA PRIORIDAD
-
-**Funcionalidad**: Permitir modificar proyectos ya guardados
-
-**Interfaz propuesta**:
-- Botón "✏️ Editar" en cada proyecto registrado
-- Cargar datos del proyecto en el formulario
-- Actualizar proyecto con validaciones
-- Historial de versiones (opcional)
-
-**Tareas**:
-- [ ] Agregar botón de edición en lista de proyectos
-- [ ] Cargar datos en el formulario
-- [ ] Validar cambios (evitar conflictos de ID)
-- [ ] Actualizar proyecto en BD
-- [ ] Registrar cambios en historial
-- [ ] Notificar a usuarios involucrados
-
----
-
-### 4. **Búsqueda y Filtros Avanzados** 🟡 MEDIA PRIORIDAD
-
-**Funcionalidad**: Facilitar la búsqueda de proyectos específicos
-
-**Filtros propuestos**:
-- 🔍 Búsqueda por nombre o ID
-- 🏢 Filtrar por organización
-- 📍 Filtrar por departamento/municipio
-- 🎯 Filtrar por ODS vinculados
-- 💰 Rango de presupuesto
-- 📊 Estado del proyecto (propuesta, aprobado, etc.)
-- 🌍 Área geográfica
-
-**Interfaz**:
-```python
-# En página de Dashboard o nueva página "Buscar Proyectos"
-col1, col2, col3 = st.columns(3)
-with col1:
-    busqueda = st.text_input("🔍 Buscar por nombre o ID")
-with col2:
-    departamento_filtro = st.selectbox("📍 Departamento", ["Todos"] + lista_departamentos)
-with col3:
-    ods_filtro = st.multiselect("🎯 ODS", opciones_ods)
-```
-
-**Tareas**:
-- [ ] Crear página de búsqueda avanzada
-- [ ] Implementar filtros múltiples
-- [ ] Agregar ordenamiento (por presupuesto, beneficiarios, etc.)
-- [ ] Exportar resultados de búsqueda
-- [ ] Guardar búsquedas frecuentes
-
----
-
-### 5. **Comparador de Proyectos** 🟡 MEDIA PRIORIDAD
+### 2. **Comparador de Proyectos** 🟡 MEDIA PRIORIDAD
 
 **Funcionalidad**: Comparar 2-4 proyectos lado a lado
 
@@ -182,7 +130,7 @@ if len(proyectos_comparar) >= 2:
 
 ---
 
-### 6. **Notificaciones y Alertas** 🟢 BAJA PRIORIDAD
+### 3. **Notificaciones y Alertas** 🟢 BAJA PRIORIDAD
 
 **Funcionalidad**: Informar a usuarios sobre eventos importantes
 
@@ -201,7 +149,7 @@ if len(proyectos_comparar) >= 2:
 
 ---
 
-### 7. **Dashboard Interactivo Mejorado** 🟢 BAJA PRIORIDAD
+### 4. **Dashboard Interactivo Mejorado** 🟢 BAJA PRIORIDAD
 
 **Mejoras propuestas**:
 - 📅 Filtros por rango de fechas
@@ -224,7 +172,7 @@ if len(proyectos_comparar) >= 2:
 
 ---
 
-### 8. **Exportación de Recomendaciones** 🟢 BAJA PRIORIDAD
+### 5. **Exportación de Recomendaciones** 🟢 BAJA PRIORIDAD
 
 **Funcionalidad**: Exportar las recomendaciones personalizadas a documentos
 
@@ -240,7 +188,7 @@ if len(proyectos_comparar) >= 2:
 
 ---
 
-### 9. **Módulo de Comentarios y Colaboración** 🟢 BAJA PRIORIDAD
+### 6. **Módulo de Comentarios y Colaboración** 🟢 BAJA PRIORIDAD
 
 **Funcionalidad**: Permitir que el equipo comente y discuta proyectos
 
@@ -267,7 +215,7 @@ if st.button("Publicar"):
 
 ---
 
-### 10. **Importación Masiva de Proyectos** 🟢 BAJA PRIORIDAD
+### 7. **Importación Masiva de Proyectos** 🟢 BAJA PRIORIDAD
 
 **Funcionalidad**: Cargar múltiples proyectos desde Excel/CSV
 
@@ -290,24 +238,25 @@ if st.button("Publicar"):
 
 ### Priorización Sugerida
 
-**Fase 1** (Crítico para producción):
-1. Persistencia de datos (Base de datos)
-2. Autenticación y roles
-3. Sistema de recomendaciones ✅ COMPLETADO
+**Fase 1** (Crítico para producción): ✅ COMPLETADO
+1. ✅ Persistencia de datos (Base de datos) - v1.3.0
+2. ✅ Edición de proyectos - v1.2.0
+3. ✅ Búsqueda y filtros avanzados - v1.2.0
+4. ✅ Sistema de recomendaciones - v1.1.0
 
-**Fase 2** (Mejoras de experiencia):
-4. Edición de proyectos
-5. Búsqueda y filtros avanzados
-6. Comparador de proyectos
+**Fase 2** (Mejoras de seguridad y experiencia):
+1. Autenticación y roles
+2. Comparador de proyectos
+3. Dashboard mejorado
 
 **Fase 3** (Funcionalidades avanzadas):
-7. Notificaciones
-8. Dashboard mejorado
-9. Módulo de comentarios
+4. Notificaciones
+5. Módulo de comentarios
+6. Exportación de recomendaciones
 
 **Fase 4** (Optimizaciones):
-10. Importación masiva
-11. Exportación de recomendaciones
+7. Importación masiva
+8. Backups automáticos programados
 
 ---
 
@@ -346,4 +295,10 @@ Para solicitar la implementación de alguna mejora específica o reportar issues
 ---
 
 **Última actualización**: 2025-01-12
-**Versión del sistema**: 1.1.0
+**Versión del sistema**: 1.3.0
+
+**Historial de versiones**:
+- v1.3.0 (2025-01-12): Persistencia con SQLite
+- v1.2.0 (2025-01-12): Búsqueda y edición de proyectos
+- v1.1.0 (2025-01-12): Sistema de recomendaciones
+- v1.0.0 (2025-01-11): Versión inicial

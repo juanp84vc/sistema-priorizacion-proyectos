@@ -11,6 +11,7 @@ if src_path not in sys.path:
 from models.proyecto import ProyectoSocial, AreaGeografica, EstadoProyecto
 from models.municipios_colombia import MUNICIPIOS_POR_DEPARTAMENTO, obtener_municipios, obtener_todos_departamentos
 from servicios.recomendador import RecomendadorProyectos
+from database.db_manager import get_db_manager
 
 
 def formatear_numero(numero: float, decimales: int = 2) -> str:
@@ -266,8 +267,11 @@ def show():
             st.error("❌ Debes seleccionar al menos un departamento")
             return
 
+        # Obtener gestor de base de datos
+        db = get_db_manager()
+
         # Verificar que no exista un proyecto con el mismo ID
-        if any(p.id == proyecto_id for p in st.session_state.proyectos):
+        if db.obtener_proyecto(proyecto_id) is not None:
             st.error(f"❌ Ya existe un proyecto con el ID '{proyecto_id}'. Por favor usa un ID diferente.")
             return
 
@@ -297,11 +301,15 @@ def show():
                 }
             )
 
-            # Guardar en session state
-            st.session_state.proyectos.append(proyecto)
-            st.session_state.proyecto_guardado = True
-
-            st.success(f"✅ Proyecto '{nombre}' creado exitosamente! Total de proyectos: {len(st.session_state.proyectos)}")
+            # Guardar en base de datos
+            if db.crear_proyecto(proyecto):
+                # Actualizar session state con la lista completa desde BD
+                st.session_state.proyectos = db.obtener_todos_proyectos()
+                st.session_state.proyecto_guardado = True
+                st.success(f"✅ Proyecto '{nombre}' creado exitosamente! Total de proyectos: {len(st.session_state.proyectos)}")
+            else:
+                st.error(f"❌ Error al guardar el proyecto en la base de datos.")
+                return
 
             # Generar recomendaciones personalizadas
             recomendador = RecomendadorProyectos()
@@ -443,9 +451,16 @@ def show():
 
         # Eliminar proyectos marcados
         if st.session_state.proyectos_a_eliminar:
+            db = get_db_manager()
             # Eliminar en orden inverso para no afectar los índices
             for idx in sorted(st.session_state.proyectos_a_eliminar, reverse=True):
                 if idx < len(st.session_state.proyectos):
-                    proyecto_eliminado = st.session_state.proyectos.pop(idx)
-                    st.success(f"✅ Proyecto '{proyecto_eliminado.nombre}' eliminado correctamente")
+                    proyecto_eliminado = st.session_state.proyectos[idx]
+                    # Eliminar de la base de datos
+                    if db.eliminar_proyecto(proyecto_eliminado.id):
+                        st.success(f"✅ Proyecto '{proyecto_eliminado.nombre}' eliminado correctamente")
+                    else:
+                        st.error(f"❌ Error al eliminar proyecto '{proyecto_eliminado.nombre}'")
+            # Recargar proyectos desde BD
+            st.session_state.proyectos = db.obtener_todos_proyectos()
             st.session_state.proyectos_a_eliminar = []
