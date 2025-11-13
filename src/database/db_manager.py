@@ -457,17 +457,32 @@ class DatabaseManager:
 # Singleton global para la aplicación
 _db_manager_instance = None
 
-def get_db_manager(db_path: str = "data/proyectos.db") -> DatabaseManager:
+def get_db_manager(db_path: str = "data/proyectos.db"):
     """
     Obtiene la instancia global del gestor de base de datos (Singleton).
+    Detecta automáticamente si usar PostgreSQL (producción) o SQLite (local).
 
     Args:
-        db_path: Ruta al archivo de base de datos
+        db_path: Ruta al archivo de base de datos SQLite (solo para local)
 
     Returns:
-        Instancia de DatabaseManager
+        Instancia de DatabaseManager o PostgreSQLManager
     """
     global _db_manager_instance
     if _db_manager_instance is None:
+        # Intentar usar PostgreSQL si está disponible (Streamlit Cloud)
+        try:
+            import streamlit as st
+            if 'postgres' in st.secrets and 'connection_string' in st.secrets['postgres']:
+                from database.postgres_manager import PostgreSQLManager
+                _db_manager_instance = PostgreSQLManager(st.secrets['postgres']['connection_string'])
+                print("✅ Usando PostgreSQL (producción)")
+                return _db_manager_instance
+        except:
+            pass
+
+        # Usar SQLite por defecto (local)
         _db_manager_instance = DatabaseManager(db_path)
+        print("✅ Usando SQLite (local)")
+
     return _db_manager_instance
