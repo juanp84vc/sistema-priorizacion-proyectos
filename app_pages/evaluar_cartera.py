@@ -399,77 +399,83 @@ def show():
                 proyecto_completo = next((p for p in proyectos_eval if p.id == resultado.proyecto_id), None)
 
                 if proyecto_completo:
-                    # Crear recomendador
-                    recomendador = RecomendadorProyectos()
+                    try:
+                        # Crear recomendador
+                        recomendador = RecomendadorProyectos()
 
-                    # Generar recomendaciones
-                    recomendaciones = recomendador.analizar_proyecto(
-                        proyecto_completo,
-                        resultado.detalle_criterios
-                    )
+                        # Generar recomendaciones
+                        recomendaciones = recomendador.analizar_proyecto(
+                            proyecto_completo,
+                            resultado.detalle_criterios
+                        )
 
-                    # Score potencial
-                    score_potencial, mensaje_potencial = recomendador.generar_score_potencial(
-                        proyecto_completo,
-                        resultado.score_final
-                    )
+                        # Score potencial
+                        score_potencial, mensaje_potencial = recomendador.generar_score_potencial(
+                            proyecto_completo,
+                            resultado.score_final
+                        )
 
-                    # Mostrar score potencial
-                    if score_potencial > resultado.score_final:
-                        delta = score_potencial - resultado.score_final
-                        col_pot1, col_pot2 = st.columns(2)
+                        # Mostrar score potencial
+                        if score_potencial > resultado.score_final:
+                            delta = score_potencial - resultado.score_final
+                            col_pot1, col_pot2 = st.columns(2)
 
-                        with col_pot1:
-                            st.metric(
-                                "Score Actual",
-                                formatear_numero(resultado.score_final, 1)
-                            )
+                            with col_pot1:
+                                st.metric(
+                                    "Score Actual",
+                                    formatear_numero(resultado.score_final, 1)
+                                )
 
-                        with col_pot2:
-                            st.metric(
-                                "Score Potencial",
-                                formatear_numero(score_potencial, 1),
-                                delta=f"+{formatear_numero(delta, 1)}",
-                                delta_color="normal"
-                            )
+                            with col_pot2:
+                                st.metric(
+                                    "Score Potencial",
+                                    formatear_numero(score_potencial, 1),
+                                    delta=f"+{formatear_numero(delta, 1)}",
+                                    delta_color="normal"
+                                )
 
-                        st.info(f"💡 {mensaje_potencial}")
-                    else:
-                        st.success(mensaje_potencial)
+                            st.info(f"💡 {mensaje_potencial}")
+                        else:
+                            st.success(mensaje_potencial)
 
-                    st.markdown("")
+                        st.markdown("")
 
-                    # Tabs para categorías de recomendaciones
-                    if any(recomendaciones.values()):
-                        tabs_labels = []
-                        tabs_content = []
+                        # Tabs para categorías de recomendaciones
+                        if any(recomendaciones.values()):
+                            tabs_labels = []
+                            tabs_content = []
 
-                        if recomendaciones['criticas']:
-                            tabs_labels.append("🔴 Críticas")
-                            tabs_content.append(recomendaciones['criticas'])
+                            if recomendaciones['criticas']:
+                                tabs_labels.append("🔴 Críticas")
+                                tabs_content.append(recomendaciones['criticas'])
 
-                        if recomendaciones['importantes']:
-                            tabs_labels.append("🟡 Importantes")
-                            tabs_content.append(recomendaciones['importantes'])
+                            if recomendaciones['importantes']:
+                                tabs_labels.append("🟡 Importantes")
+                                tabs_content.append(recomendaciones['importantes'])
 
-                        if recomendaciones['opcionales']:
-                            tabs_labels.append("🟢 Opcionales")
-                            tabs_content.append(recomendaciones['opcionales'])
+                            if recomendaciones['opcionales']:
+                                tabs_labels.append("🟢 Opcionales")
+                                tabs_content.append(recomendaciones['opcionales'])
 
-                        if recomendaciones['fortalezas']:
-                            tabs_labels.append("✅ Fortalezas")
-                            tabs_content.append(recomendaciones['fortalezas'])
+                            if recomendaciones['fortalezas']:
+                                tabs_labels.append("✅ Fortalezas")
+                                tabs_content.append(recomendaciones['fortalezas'])
 
-                        if tabs_labels:
-                            tabs = st.tabs(tabs_labels)
+                            if tabs_labels:
+                                tabs = st.tabs(tabs_labels)
 
-                            for i, (tab, content) in enumerate(zip(tabs, tabs_content)):
-                                with tab:
-                                    for recomendacion in content:
-                                        st.markdown(recomendacion)
-                                        st.markdown("")
-                    else:
-                        st.info("No hay recomendaciones específicas para este proyecto.")
+                                for i, (tab, content) in enumerate(zip(tabs, tabs_content)):
+                                    with tab:
+                                        for recomendacion in content:
+                                            st.markdown(recomendacion)
+                                            st.markdown("")
+                        else:
+                            st.info("No hay recomendaciones específicas para este proyecto.")
+
+                    except Exception as e:
+                        st.error(f"❌ Error al generar recomendaciones: {str(e)}")
+                        import traceback
+                        st.code(traceback.format_exc())
 
         # Botón para exportar
         st.markdown("---")
