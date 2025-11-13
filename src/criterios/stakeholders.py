@@ -112,6 +112,14 @@ class ContribucionStakeholdersCriterio(CriterioEvaluacion):
         if any(pop in poblacion_lower for pop in poblaciones_prioritarias):
             score *= 1.05  # 5% bonus por población vulnerable
 
+        # INTEGRACIÓN DE CAMPOS CUALITATIVOS
+        # Ajuste por Nivel de Contribución al Relacionamiento (cualitativo)
+        contribucion = proyecto.indicadores_impacto.get('contribucion_stakeholders', 'Moderada')
+        if contribucion == 'Alta':
+            score *= 1.20  # 20% bonus por alta contribución explícita
+        elif contribucion == 'Baja':
+            score *= 0.80  # 20% penalización por baja contribución
+
         return min(max(score, 0), 100)
 
     def get_nombre(self) -> str:

@@ -150,6 +150,18 @@ class RiesgosCriterio(CriterioEvaluacion):
         if "rural" in poblacion_lower or "dispersa" in poblacion_lower:
             riesgo_total *= 0.95  # 5% penalización por desafíos tecnológicos
 
+        # INTEGRACIÓN DE CAMPOS CUALITATIVOS
+        # Ajuste por Nivel de Riesgos (evaluación cualitativa)
+        nivel_riesgos = proyecto.indicadores_impacto.get('nivel_riesgos', 'Medios y manejables')
+        if nivel_riesgos == 'Bajos y manejables':
+            riesgo_total *= 1.25  # 25% mejora (score más alto = riesgo más bajo)
+        elif nivel_riesgos == 'Medios y manejables':
+            riesgo_total *= 1.08  # 8% mejora
+        elif nivel_riesgos == 'Altos pero mitigables':
+            riesgo_total *= 0.85  # 15% penalización
+        elif nivel_riesgos == 'Altos y complejos':
+            riesgo_total *= 0.70  # 30% penalización por riesgos muy altos
+
         return min(max(riesgo_total, 0), 100)
 
     @staticmethod

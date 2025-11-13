@@ -40,7 +40,9 @@ class CostoEfectividadCriterio(CriterioEvaluacion):
         1. Calcula costo por beneficiario
         2. Evalúa eficiencia temporal (costo anualizado)
         3. Aplica escala inversa (menor costo = mayor puntaje)
-        4. Normaliza a escala 0-100
+        4. Integra pertinencia operacional y reputacional
+        5. Considera SROI si está disponible
+        6. Normaliza a escala 0-100
 
         Returns:
             Score de 0-100 (100 = máxima costo-efectividad)
@@ -76,6 +78,19 @@ class CostoEfectividadCriterio(CriterioEvaluacion):
         beneficiarios_por_millon = proyecto.beneficiarios_totales / (proyecto.presupuesto_total / 1_000_000)
         if beneficiarios_por_millon > 1000:  # Más de 1000 beneficiarios por millón de pesos
             score *= 1.05  # 5% bonus por alta eficiencia
+
+        # INTEGRACIÓN DE CAMPOS CUALITATIVOS
+        # Ajuste por Pertinencia Operacional y Reputacional
+        pertinencia = proyecto.indicadores_impacto.get('pertinencia_operacional', 'Media')
+        if pertinencia == 'Alta':
+            score *= 1.15  # 15% bonus por alta pertinencia
+        elif pertinencia == 'Baja':
+            score *= 0.85  # 15% penalización por baja pertinencia
+
+        # Ajuste por SROI (si existe y es significativo)
+        sroi = proyecto.indicadores_impacto.get('sroi', '')
+        if sroi and len(sroi) > 10:  # Si hay un análisis SROI documentado
+            score *= 1.08  # 8% bonus por tener análisis de retorno social
 
         return min(max(score, 0), 100)
 

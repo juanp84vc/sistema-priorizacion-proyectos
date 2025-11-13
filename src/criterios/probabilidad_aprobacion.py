@@ -122,6 +122,16 @@ class ProbabilidadAprobacionCriterio(CriterioEvaluacion):
         if proyecto.beneficiarios_totales >= 5000:
             score *= 1.1  # 10% bonus por alto impacto
 
+        # INTEGRACIÓN DE CAMPOS CUALITATIVOS
+        # Ajuste por Alineación con Sectores Prioritarios ZOMAC/PDET
+        sectores = proyecto.indicadores_impacto.get('sectores_zomac', 'Otros sectores')
+        if sectores == 'Top 4 sectores ZOMAC/PDET':
+            score *= 1.25  # 25% bonus por máxima prioridad gubernamental
+        elif sectores == 'Sectores estratégicos nacionales':
+            score *= 1.15  # 15% bonus por prioridad nacional
+        elif sectores == 'Sectores regionales prioritarios':
+            score *= 1.08  # 8% bonus por prioridad regional
+
         return min(max(score, 0), 100)
 
     def _probabilidad_a_score(self, probabilidad: NivelProbabilidad) -> float:
