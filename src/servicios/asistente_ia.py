@@ -1,5 +1,5 @@
 """
-Servicio de Asistente IA con Google Gemini.
+Servicio de Asistente IA con múltiples LLMs (Claude, OpenAI, Gemini).
 Proporciona análisis inteligente de proyectos y responde preguntas contextuales.
 """
 import os
@@ -8,83 +8,39 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
-import google.generativeai as genai
 from models.proyecto import ProyectoSocial
 from models.evaluacion import ResultadoEvaluacion
+from servicios.llm_provider import LLMProvider
 
-# Asegurar que las variables de entorno estén cargadas
-# Buscar el archivo .env en la raíz del proyecto (para desarrollo local)
+# Configuración de entorno
 env_path = Path(__file__).parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path, override=True)
-
-# Intentar importar streamlit para acceso a secrets (Streamlit Cloud)
-try:
-    import streamlit as st
-    STREAMLIT_AVAILABLE = True
-except ImportError:
-    STREAMLIT_AVAILABLE = False
 
 
 class AsistenteIA:
     """
     Asistente inteligente para análisis de proyectos sociales.
-    Usa Google Gemini para proporcionar insights y responder preguntas.
+    Soporta múltiples LLMs: Claude (recomendado), OpenAI (ChatGPT), y Gemini.
     """
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, provider: Optional[str] = None):
         """
-        Inicializa el asistente IA.
+        Inicializa el asistente IA con proveedor de LLM configurable.
 
         Args:
-            api_key: API key de Google Gemini (si no se proporciona, lee de .env o st.secrets)
+            provider: Proveedor de LLM ('claude', 'openai', 'gemini')
+                     Si es None, usa LLM_PROVIDER del .env (default: claude)
         """
-        # Recargar .env para asegurar que está actualizado (desarrollo local)
+        # Recargar .env para asegurar que está actualizado
         load_dotenv(dotenv_path=env_path, override=True)
 
-        # Obtener API key de múltiples fuentes (en orden de prioridad):
-        # 1. Parámetro directo
-        # 2. Streamlit secrets (Streamlit Cloud)
-        # 3. Variable de entorno (local con .env)
-        self.api_key = None
-
-        if api_key:
-            self.api_key = api_key
-        elif STREAMLIT_AVAILABLE and hasattr(st, 'secrets'):
-            try:
-                if 'GOOGLE_API_KEY' in st.secrets:
-                    self.api_key = st.secrets['GOOGLE_API_KEY']
-            except:
-                pass  # Si no hay secrets.toml, usar variable de entorno
-
-        if not self.api_key:
-            self.api_key = os.getenv('GOOGLE_API_KEY')
-
-        # Debug: imprimir información
-        fuente = "Variable de entorno"
-        if api_key:
-            fuente = "Parámetro directo"
-        elif self.api_key and self.api_key != os.getenv('GOOGLE_API_KEY'):
-            fuente = "Streamlit Secrets"
-
-        print(f"DEBUG - API Key cargada: {self.api_key[:20] if self.api_key else 'None'}...")
-        print(f"DEBUG - Fuente: {fuente}")
-        print(f"DEBUG - Ruta .env: {env_path}")
-        print(f"DEBUG - .env existe: {env_path.exists()}")
-
-        # Validación simplificada
-        if not self.api_key:
-            raise ValueError(
-                "API key de Google Gemini no encontrada. "
-                "Configura GOOGLE_API_KEY en:\n"
-                "- Desarrollo local: archivo .env en la raíz del proyecto\n"
-                "- Streamlit Cloud: Settings > Secrets"
-            )
-
-        # Configurar Gemini
-        genai.configure(api_key=self.api_key)
-
-        # Usar Gemini 2.5 Flash (modelo estable, rápido y gratis)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        # Inicializar proveedor de LLM
+        try:
+            self.llm = LLMProvider(provider=provider)
+            llm_info = self.llm.get_info()
+            print(f"✅ Asistente IA inicializado con {llm_info['provider']} ({llm_info['model']})")
+        except Exception as e:
+            raise ValueError(f"Error al inicializar LLM: {str(e)}")
 
         # Historial de conversación
         self.historial_chat: List[Dict[str, str]] = []
@@ -288,8 +244,7 @@ El sistema evalúa proyectos con 4 criterios:
 """
 
         try:
-            response = self.model.generate_content(prompt)
-            respuesta = response.text
+            respuesta = self.llm.generate(prompt)
 
             # Guardar en caché
             self._save_to_cache(cache_key, respuesta)
@@ -337,10 +292,8 @@ El sistema evalúa proyectos con 4 criterios:
 """
 
         try:
-            response = self.model.generate_content(prompt, stream=True)
-            for chunk in response:
-                if chunk.text:
-                    yield chunk.text
+            for chunk in self.llm.generate_stream(prompt):
+                yield chunk
         except Exception as e:
             yield f"❌ Error al consultar el asistente: {str(e)}"
 
@@ -383,8 +336,7 @@ El sistema evalúa proyectos con 4 criterios (cada uno 25%):
 """
 
         try:
-            response = self.model.generate_content(prompt)
-            return response.text
+            return self.llm.generate(prompt)
         except Exception as e:
             return f"❌ Error al consultar el asistente: {str(e)}"
 
@@ -429,10 +381,8 @@ El sistema evalúa proyectos con 4 criterios (cada uno 25%):
 """
 
         try:
-            response = self.model.generate_content(prompt, stream=True)
-            for chunk in response:
-                if chunk.text:
-                    yield chunk.text
+            for chunk in self.llm.generate_stream(prompt):
+                yield chunk
         except Exception as e:
             yield f"❌ Error al consultar el asistente: {str(e)}"
 
@@ -464,8 +414,7 @@ Usa formato markdown, sé conciso y profesional. Base todo en los datos proporci
 """
 
         try:
-            response = self.model.generate_content(prompt)
-            return response.text
+            return self.llm.generate(prompt)
         except Exception as e:
             return f"❌ Error al generar resumen: {str(e)}"
 
@@ -498,8 +447,7 @@ Usa formato markdown con listas y sé específico con datos.
 """
 
         try:
-            response = self.model.generate_content(prompt)
-            return response.text
+            return self.llm.generate(prompt)
         except Exception as e:
             return f"❌ Error al analizar tendencias: {str(e)}"
 
@@ -577,8 +525,7 @@ Usa formato markdown con tablas si es apropiado. Sé específico con datos.
 """
 
         try:
-            response = self.model.generate_content(prompt)
-            return response.text
+            return self.llm.generate(prompt)
         except Exception as e:
             return f"❌ Error al comparar proyectos: {str(e)}"
 
@@ -618,10 +565,8 @@ Usa formato markdown con tablas si es apropiado. Sé específico con datos.
 """
 
         try:
-            response = self.model.generate_content(prompt, stream=True)
-            for chunk in response:
-                if chunk.text:
-                    yield chunk.text
+            for chunk in self.llm.generate_stream(prompt):
+                yield chunk
         except Exception as e:
             yield f"❌ Error al comparar proyectos: {str(e)}"
 
@@ -663,8 +608,7 @@ Responde de manera profesional, clara y útil. Usa formato markdown.
 """
 
         try:
-            response = self.model.generate_content(prompt)
-            respuesta = response.text
+            respuesta = self.llm.generate(prompt)
 
             # Agregar respuesta al historial
             self.historial_chat.append({
