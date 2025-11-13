@@ -193,14 +193,67 @@ def show():
             default=["ODS 1"]
         )
 
-        # Nota informativa sobre los criterios de evaluación
-        st.info("""
-        💡 **Nota**: Los criterios de evaluación se calculan automáticamente basándose en:
-        - Costo-Efectividad: presupuesto por beneficiario
-        - Contribución a Stakeholders: alcance geográfico y cobertura
-        - Probabilidad de Aprobación: alineación con ODS y población objetivo
-        - Evaluación de Riesgos: complejidad presupuestaria y temporal
-        """)
+        # Sección 5: Información Cualitativa de Criterios
+        st.markdown("#### 📋 Información Adicional de Evaluación")
+        st.caption("Información cualitativa que complementa la evaluación automática")
+
+        # Criterio 1: Costo-Efectividad
+        st.markdown("**Criterio 1: Costo-Efectividad**")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            sroi = st.text_area(
+                "SROI (Retorno Social de la Inversión)",
+                placeholder="Describe el retorno social esperado del proyecto...",
+                height=100,
+                help="Información cualitativa sobre el impacto social esperado por cada peso invertido"
+            )
+
+        with col2:
+            pertinencia_operacional = st.selectbox(
+                "Pertinencia Operacional y Reputacional",
+                options=["Alta", "Media", "Baja"],
+                index=1,
+                help="Evalúa la pertinencia del proyecto para las operaciones y reputación de GEB"
+            )
+
+        st.markdown("---")
+
+        # Criterio 2: Relacionamiento con Stakeholders
+        st.markdown("**Criterio 2: Relacionamiento con Stakeholders**")
+        contribucion_stakeholders = st.selectbox(
+            "Nivel de Contribución al Relacionamiento",
+            options=["Alta", "Moderada", "Baja"],
+            index=1,
+            help="Evalúa el nivel de contribución al relacionamiento con stakeholders locales"
+        )
+
+        st.markdown("---")
+
+        # Criterio 3: Probabilidad de Aprobación
+        st.markdown("**Criterio 3: Probabilidad de Aprobación**")
+        sectores_zomac = st.selectbox(
+            "Alineación con Sectores Prioritarios",
+            options=[
+                "Top 4 sectores ZOMAC/PDET",
+                "Sectores estratégicos nacionales",
+                "Sectores regionales prioritarios",
+                "Otros sectores"
+            ],
+            index=0,
+            help="Indica si el proyecto está en los sectores prioritarios de ZOMAC/PDET"
+        )
+
+        st.markdown("---")
+
+        # Criterio 4: Riesgos de Ejecución
+        st.markdown("**Criterio 4: Riesgos de Ejecución**")
+        nivel_riesgos = st.selectbox(
+            "Nivel de Riesgos",
+            options=["Bajos y manejables", "Medios y manejables", "Altos pero mitigables", "Altos y complejos"],
+            index=1,
+            help="Evaluación cualitativa de los riesgos asociados a la ejecución del proyecto"
+        )
 
         # Botones
         st.markdown("---")
@@ -253,7 +306,13 @@ def show():
                 municipios=municipios_selected,
                 estado=EstadoProyecto.PROPUESTA,
                 indicadores_impacto={
-                    # Valores por defecto - no usados por nuevos criterios
+                    # Información cualitativa de criterios
+                    'sroi': sroi if sroi else '',
+                    'pertinencia_operacional': pertinencia_operacional,
+                    'contribucion_stakeholders': contribucion_stakeholders,
+                    'sectores_zomac': sectores_zomac,
+                    'nivel_riesgos': nivel_riesgos,
+                    # Valores por defecto para compatibilidad
                     'años_experiencia': 5,
                     'equipo_calificado': 0.8,
                     'proyectos_exitosos': 3,
