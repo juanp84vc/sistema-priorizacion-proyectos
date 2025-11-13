@@ -39,8 +39,8 @@ class AsistenteIA:
         # Configurar Gemini
         genai.configure(api_key=self.api_key)
 
-        # Usar Gemini 1.5 Flash (más rápido y gratis)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # Usar Gemini Pro (modelo estable y gratis)
+        self.model = genai.GenerativeModel('gemini-pro')
 
         # Historial de conversación
         self.historial_chat: List[Dict[str, str]] = []
