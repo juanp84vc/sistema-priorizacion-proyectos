@@ -193,54 +193,14 @@ def show():
             default=["ODS 1"]
         )
 
-        # Sección 5: Indicadores de Capacidad
-        st.markdown("#### 📊 Indicadores de Capacidad Organizacional")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            años_exp = st.number_input(
-                "Años de experiencia de la organización",
-                min_value=0,
-                max_value=100,
-                value=5,
-                step=1
-            )
-
-            proyectos_exitosos = st.number_input(
-                "Proyectos exitosos previos",
-                min_value=0,
-                max_value=1000,
-                value=3,
-                step=1
-            )
-
-        with col2:
-            equipo_calificado = st.slider(
-                "% Equipo calificado",
-                min_value=0.0,
-                max_value=1.0,
-                value=0.8,
-                step=0.05,
-                format="%.0f%%"
-            )
-
-            fuentes_financiamiento = st.number_input(
-                "Fuentes de financiamiento",
-                min_value=1,
-                max_value=20,
-                value=3,
-                step=1
-            )
-
-        ingresos_propios = st.slider(
-            "% Ingresos propios",
-            min_value=0.0,
-            max_value=100.0,
-            value=20.0,
-            step=5.0,
-            format="%.0f%%"
-        )
+        # Nota informativa sobre los criterios de evaluación
+        st.info("""
+        💡 **Nota**: Los criterios de evaluación se calculan automáticamente basándose en:
+        - Costo-Efectividad: presupuesto por beneficiario
+        - Contribución a Stakeholders: alcance geográfico y cobertura
+        - Probabilidad de Aprobación: alineación con ODS y población objetivo
+        - Evaluación de Riesgos: complejidad presupuestaria y temporal
+        """)
 
         # Botones
         st.markdown("---")
@@ -293,11 +253,12 @@ def show():
                 municipios=municipios_selected,
                 estado=EstadoProyecto.PROPUESTA,
                 indicadores_impacto={
-                    'años_experiencia': años_exp,
-                    'equipo_calificado': equipo_calificado,
-                    'proyectos_exitosos': proyectos_exitosos,
-                    'fuentes_financiamiento': fuentes_financiamiento,
-                    'ingresos_propios_pct': ingresos_propios
+                    # Valores por defecto - no usados por nuevos criterios
+                    'años_experiencia': 5,
+                    'equipo_calificado': 0.8,
+                    'proyectos_exitosos': 3,
+                    'fuentes_financiamiento': 3,
+                    'ingresos_propios_pct': 20.0
                 }
             )
 
