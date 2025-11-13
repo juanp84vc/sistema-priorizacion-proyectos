@@ -1,9 +1,13 @@
 """
 Sistema de recomendaciones para optimizar proyectos sociales.
 Analiza proyectos y sugiere mejoras para maximizar su puntaje.
+
+Version: 2.0.0 - Actualizado con 4 criterios
 """
 from typing import List, Dict, Tuple
 from models.proyecto import ProyectoSocial
+
+__version__ = "2.0.0"
 
 
 class RecomendadorProyectos:

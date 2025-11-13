@@ -403,6 +403,12 @@ def show():
                         # Crear recomendador
                         recomendador = RecomendadorProyectos()
 
+                        # Verificar versión del módulo
+                        if hasattr(recomendador, '__module__'):
+                            import servicios.recomendador as rec_module
+                            if hasattr(rec_module, '__version__'):
+                                st.caption(f"🔧 Recomendador v{rec_module.__version__}")
+
                         # Generar recomendaciones
                         recomendaciones = recomendador.analizar_proyecto(
                             proyecto_completo,
