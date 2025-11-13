@@ -84,15 +84,24 @@ def show():
 
         # Timeline de versiones
         st.markdown("##### 📅 Línea de Tiempo")
-        timeline = historial.generar_timeline()
+        timeline = historial.obtener_timeline()
 
         for evento in timeline:
-            fecha = datetime.fromisoformat(evento['fecha']).strftime("%d/%m/%Y %H:%M")
+            # La fecha ya es un objeto datetime, no necesita conversión
+            fecha = evento['fecha'].strftime("%d/%m/%Y %H:%M")
+            tipo_evento = evento['tipo']
 
-            if evento['tipo'] == 'version':
+            if tipo_evento == 'creacion':
                 st.markdown(
-                    f"**{fecha}** - 🔖 Versión {evento['numero_version']} "
-                    f"(Score: {evento['score']:.1f})"
+                    f"**{fecha}** - 🎉 Proyecto creado "
+                    f"(Score inicial: {evento['score']:.1f})"
+                )
+
+            elif tipo_evento == 'actualizacion':
+                mejora_str = f"+{evento['mejora']:.1f}" if evento.get('mejora', 0) >= 0 else f"{evento['mejora']:.1f}"
+                st.markdown(
+                    f"**{fecha}** - 🔖 Versión {evento['version']} "
+                    f"(Score: {evento['score']:.1f}, {mejora_str} pts)"
                 )
                 if evento.get('cambios'):
                     for cambio in evento['cambios'][:3]:  # Mostrar solo primeros 3
@@ -100,9 +109,9 @@ def show():
                     if len(evento['cambios']) > 3:
                         st.markdown(f"  - *...y {len(evento['cambios']) - 3} más*")
 
-            elif evento['tipo'] == 'recomendacion_implementada':
+            elif tipo_evento == 'recomendacion':
                 st.markdown(
-                    f"**{fecha}** - ✅ Recomendación implementada: "
+                    f"**{fecha}** - ✅ Recomendación implementada ({evento['criterio']}): "
                     f"*{evento['descripcion'][:60]}...*"
                 )
 
