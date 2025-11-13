@@ -320,7 +320,11 @@ def show():
             # Generar recomendaciones personalizadas
             recomendador = RecomendadorProyectos()
             recomendaciones = recomendador.analizar_proyecto(proyecto)
-            score_estimado, mensaje_score = recomendador.generar_score_potencial(proyecto)
+            # Para proyecto nuevo, usar score estimado base de 50
+            score_estimado, mensaje_score = recomendador.generar_score_potencial(
+                proyecto=proyecto,
+                score_actual=50.0  # Score base para proyecto nuevo sin evaluar
+            )
 
             # Mostrar score estimado
             st.info(f"📊 {mensaje_score}")
