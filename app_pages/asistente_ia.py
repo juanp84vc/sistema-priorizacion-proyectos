@@ -9,9 +9,15 @@ def show():
     """Muestra la página del Asistente IA."""
     st.markdown("### 🤖 Asistente IA - Análisis Inteligente de Proyectos")
 
-    # Botón para reinicializar el asistente (útil si se actualizó el .env)
-    col1, col2 = st.columns([6, 1])
+    # Botones de control
+    col1, col2, col3 = st.columns([5, 1, 1])
     with col2:
+        if st.button("🗑️ Limpiar Caché", help="Limpia el caché de respuestas"):
+            if 'asistente_ia' in st.session_state:
+                st.session_state.asistente_ia.limpiar_cache()
+                st.success("✅ Caché limpiado")
+                st.rerun()
+    with col3:
         if st.button("🔄 Reiniciar", help="Recarga la configuración del asistente"):
             if 'asistente_ia' in st.session_state:
                 del st.session_state.asistente_ia
@@ -109,28 +115,32 @@ def show():
             if not pregunta:
                 st.warning("⚠️ Por favor escribe una pregunta.")
             else:
-                with st.spinner("🤖 Analizando proyecto..."):
-                    # Obtener resultado de evaluación si existe
-                    resultado = None
-                    if hasattr(st.session_state, 'resultados_evaluacion'):
-                        resultado = next(
-                            (r for r in st.session_state.resultados_evaluacion if r.proyecto_id == proyecto.id),
-                            None
-                        )
+                # Obtener resultado de evaluación si existe
+                resultado = None
+                if hasattr(st.session_state, 'resultados_evaluacion'):
+                    resultado = next(
+                        (r for r in st.session_state.resultados_evaluacion if r.proyecto_id == proyecto.id),
+                        None
+                    )
 
-                    # Caso especial: resumen ejecutivo
-                    if pregunta == "__RESUMEN_EJECUTIVO__":
-                        if resultado:
+                # Caso especial: resumen ejecutivo
+                if pregunta == "__RESUMEN_EJECUTIVO__":
+                    if resultado:
+                        with st.spinner("🤖 Generando resumen ejecutivo..."):
                             respuesta = asistente.generar_resumen_ejecutivo(proyecto, resultado)
-                        else:
-                            st.warning("⚠️ Primero evalúa este proyecto en 'Evaluar Cartera' para generar un resumen ejecutivo completo.")
-                            respuesta = None
+                            st.markdown("#### 💡 Respuesta del Asistente:")
+                            st.markdown(respuesta)
                     else:
-                        respuesta = asistente.consultar_proyecto(pregunta, proyecto, resultado)
+                        st.warning("⚠️ Primero evalúa este proyecto en 'Evaluar Cartera' para generar un resumen ejecutivo completo.")
+                else:
+                    # Usar streaming para respuesta progresiva
+                    st.markdown("#### 💡 Respuesta del Asistente:")
+                    respuesta_placeholder = st.empty()
+                    respuesta_completa = ""
 
-                    if respuesta:
-                        st.markdown("#### 💡 Respuesta del Asistente:")
-                        st.markdown(respuesta)
+                    for chunk in asistente.consultar_proyecto_stream(pregunta, proyecto, resultado):
+                        respuesta_completa += chunk
+                        respuesta_placeholder.markdown(respuesta_completa)
 
                 # Limpiar pregunta
                 if 'pregunta_proyecto' in st.session_state:
@@ -182,26 +192,30 @@ def show():
             if not pregunta_cartera:
                 st.warning("⚠️ Por favor escribe una pregunta.")
             else:
-                with st.spinner("🤖 Analizando cartera..."):
-                    # Obtener resultados si están disponibles
-                    resultados = st.session_state.get('resultados_evaluacion', None) if analizar_con_scores else None
+                # Obtener resultados si están disponibles
+                resultados = st.session_state.get('resultados_evaluacion', None) if analizar_con_scores else None
 
-                    if analizar_con_scores and tipo_analisis == "Tendencias y Patrones" and resultados:
-                        # Usar método especial para tendencias
-                        respuesta = asistente.analizar_tendencias_cartera(
-                            st.session_state.proyectos,
-                            resultados
-                        )
-                    else:
-                        # Consulta general de cartera
-                        respuesta = asistente.consultar_cartera(
-                            pregunta_cartera,
-                            st.session_state.proyectos,
-                            resultados
-                        )
+                st.markdown("#### 💡 Análisis del Asistente:")
+                respuesta_placeholder = st.empty()
+                respuesta_completa = ""
 
-                    st.markdown("#### 💡 Análisis del Asistente:")
-                    st.markdown(respuesta)
+                if analizar_con_scores and tipo_analisis == "Tendencias y Patrones" and resultados:
+                    # Usar método especial para tendencias con streaming
+                    for chunk in asistente.analizar_tendencias_cartera_stream(
+                        st.session_state.proyectos,
+                        resultados
+                    ):
+                        respuesta_completa += chunk
+                        respuesta_placeholder.markdown(respuesta_completa)
+                else:
+                    # Consulta general de cartera con streaming
+                    for chunk in asistente.consultar_cartera_stream(
+                        pregunta_cartera,
+                        st.session_state.proyectos,
+                        resultados
+                    ):
+                        respuesta_completa += chunk
+                        respuesta_placeholder.markdown(respuesta_completa)
 
     # ==================== TAB: COMPARAR PROYECTOS ====================
     with tab_comparacion:
@@ -253,28 +267,30 @@ def show():
             st.markdown("---")
 
             if st.button("🔄 Comparar con IA", type="primary", key="btn_comparar"):
-                with st.spinner("🤖 Comparando proyectos..."):
-                    # Obtener resultados si existen
-                    resultado1 = None
-                    resultado2 = None
+                # Obtener resultados si existen
+                resultado1 = None
+                resultado2 = None
 
-                    if hasattr(st.session_state, 'resultados_evaluacion'):
-                        resultado1 = next(
-                            (r for r in st.session_state.resultados_evaluacion if r.proyecto_id == proyecto1.id),
-                            None
-                        )
-                        resultado2 = next(
-                            (r for r in st.session_state.resultados_evaluacion if r.proyecto_id == proyecto2.id),
-                            None
-                        )
-
-                    respuesta = asistente.comparar_proyectos(
-                        proyecto1, proyecto2,
-                        resultado1, resultado2
+                if hasattr(st.session_state, 'resultados_evaluacion'):
+                    resultado1 = next(
+                        (r for r in st.session_state.resultados_evaluacion if r.proyecto_id == proyecto1.id),
+                        None
+                    )
+                    resultado2 = next(
+                        (r for r in st.session_state.resultados_evaluacion if r.proyecto_id == proyecto2.id),
+                        None
                     )
 
-                    st.markdown("#### 💡 Comparación del Asistente:")
-                    st.markdown(respuesta)
+                st.markdown("#### 💡 Comparación del Asistente:")
+                respuesta_placeholder = st.empty()
+                respuesta_completa = ""
+
+                for chunk in asistente.comparar_proyectos_stream(
+                    proyecto1, proyecto2,
+                    resultado1, resultado2
+                ):
+                    respuesta_completa += chunk
+                    respuesta_placeholder.markdown(respuesta_completa)
 
     # ==================== TAB: CHAT LIBRE ====================
     with tab_chat:
