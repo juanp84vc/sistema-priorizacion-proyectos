@@ -180,20 +180,7 @@ def show():
                 step=10
             )
 
-        # Sección 4: ODS
-        st.markdown("#### 🎯 Objetivos de Desarrollo Sostenible (ODS)")
-
-        ods_vinculados = st.multiselect(
-            "Selecciona los ODS a los que contribuye el proyecto",
-            options=[
-                "ODS 1", "ODS 2", "ODS 3", "ODS 4", "ODS 5", "ODS 6",
-                "ODS 7", "ODS 8", "ODS 9", "ODS 10", "ODS 11", "ODS 12",
-                "ODS 13", "ODS 14", "ODS 15", "ODS 16", "ODS 17"
-            ],
-            default=["ODS 1"]
-        )
-
-        # Sección 5: Información Cualitativa de Criterios
+        # Sección 4: Información Cualitativa de Criterios
         st.markdown("#### 📋 Información Adicional de Evaluación")
         st.caption("Información cualitativa que complementa la evaluación automática")
 
@@ -273,10 +260,6 @@ def show():
             st.error("❌ Por favor completa todos los campos obligatorios (*)")
             return
 
-        if len(ods_vinculados) == 0:
-            st.error("❌ Debes seleccionar al menos un ODS")
-            return
-
         if len(departamentos_selected) == 0:
             st.error("❌ Debes seleccionar al menos un departamento")
             return
@@ -300,7 +283,7 @@ def show():
                 beneficiarios_indirectos=beneficiarios_indirectos,
                 duracion_meses=duracion_meses,
                 presupuesto_total=presupuesto,
-                ods_vinculados=ods_vinculados,
+                ods_vinculados=[],  # Campo mantenido para compatibilidad pero vacío
                 area_geografica=AreaGeografica(area_geografica),
                 poblacion_objetivo=poblacion,
                 departamentos=departamentos_selected,
@@ -451,9 +434,6 @@ def show():
 
                 with col3:
                     st.markdown(f"""
-                    **ODS:**
-                    {', '.join(proyecto.ods_vinculados)}
-
                     **Departamentos:**
                     {', '.join(proyecto.departamentos)}
                     """)
