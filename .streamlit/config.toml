@@ -1,0 +1,7 @@
+# Configuración de Streamlit
+[global]
+developmentMode = false
+
+[server]
+port = 8501
+headless = true

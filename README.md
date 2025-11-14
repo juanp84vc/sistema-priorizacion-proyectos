@@ -259,3 +259,54 @@ Para uso en producción, se recomienda agregar:
 - Logs y monitoreo
 - Tests de integración completos
 
+
+## 🌐 Despliegue en Streamlit Cloud
+
+### Requisitos previos
+1. Cuenta en [Streamlit Cloud](https://streamlit.io/cloud)
+2. Repositorio en GitHub con este código
+3. API Keys configuradas (Google Gemini, Claude, etc.)
+
+### Pasos para desplegar:
+
+1. **Subir código a GitHub:**
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin https://github.com/TU_USUARIO/TU_REPO.git
+   git push -u origin main
+   ```
+
+2. **Configurar en Streamlit Cloud:**
+   - Ve a [share.streamlit.io](https://share.streamlit.io)
+   - Conecta tu repositorio de GitHub
+   - Selecciona el archivo `app.py`
+   - En **Advanced settings** → **Secrets**, agrega:
+     ```toml
+     GOOGLE_API_KEY = "tu_api_key_de_google"
+     ANTHROPIC_API_KEY = "tu_api_key_de_claude"
+     OPENAI_API_KEY = "tu_api_key_de_openai"
+     LLM_PROVIDER = "gemini"
+     ```
+
+3. **Deploy!**
+   - Haz clic en "Deploy"
+   - La aplicación estará disponible en: `https://TU_APP.streamlit.app`
+
+### Variables de entorno necesarias:
+
+| Variable | Descripción | Requerida |
+|----------|-------------|-----------|
+| `GOOGLE_API_KEY` | API Key de Google Gemini | Sí (si usas Gemini) |
+| `ANTHROPIC_API_KEY` | API Key de Claude | Sí (si usas Claude) |
+| `OPENAI_API_KEY` | API Key de OpenAI | Sí (si usas ChatGPT) |
+| `LLM_PROVIDER` | Proveedor por defecto: `gemini`, `claude`, o `openai` | Sí |
+
+### Notas importantes para producción:
+
+- ⚠️ **Base de datos**: En producción, considera usar PostgreSQL en lugar de SQLite
+- 🔒 **Seguridad**: Nunca subas archivos `.env` a GitHub
+- 📊 **Límites**: Streamlit Cloud tiene límites de recursos gratuitos
+- 💾 **Persistencia**: Los archivos guardados pueden perderse en reinicios (usa almacenamiento externo para producción)
+

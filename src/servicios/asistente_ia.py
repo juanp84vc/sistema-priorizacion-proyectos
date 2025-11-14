@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from models.proyecto import ProyectoSocial
 from models.evaluacion import ResultadoEvaluacion
 from servicios.llm_provider import LLMProvider
+from servicios.historial_ia import HistorialIA
 
 # Configuración de entorno
 env_path = Path(__file__).parent.parent.parent / '.env'
@@ -23,13 +24,14 @@ class AsistenteIA:
     Soporta múltiples LLMs: Claude (recomendado), OpenAI (ChatGPT), y Gemini.
     """
 
-    def __init__(self, provider: Optional[str] = None):
+    def __init__(self, provider: Optional[str] = None, guardar_historial: bool = True):
         """
         Inicializa el asistente IA con proveedor de LLM configurable.
 
         Args:
             provider: Proveedor de LLM ('claude', 'openai', 'gemini')
                      Si es None, usa LLM_PROVIDER del .env (default: claude)
+            guardar_historial: Si debe guardar automáticamente las consultas en la base de datos
         """
         # Recargar .env para asegurar que está actualizado
         load_dotenv(dotenv_path=env_path, override=True)
@@ -48,6 +50,15 @@ class AsistenteIA:
         # Caché de respuestas (clave: hash de pregunta+contexto, valor: {respuesta, timestamp})
         self._cache: Dict[str, Dict] = {}
         self._cache_ttl = timedelta(minutes=30)  # TTL de 30 minutos
+
+        # Servicio de historial persistente
+        self.guardar_historial = guardar_historial
+        if self.guardar_historial:
+            try:
+                self.historial_db = HistorialIA()
+            except Exception as e:
+                print(f"⚠️ No se pudo inicializar historial persistente: {str(e)}")
+                self.guardar_historial = False
 
     def _generar_cache_key(self, *args) -> str:
         """Genera una clave de caché única basada en los argumentos."""
@@ -75,6 +86,41 @@ class AsistenteIA:
     def limpiar_cache(self):
         """Limpia el caché de respuestas."""
         self._cache = {}
+
+    def _guardar_en_historial(self, pregunta: str, respuesta: str, tipo_analisis: str,
+                              proyecto_id: Optional[str] = None,
+                              proyecto_nombre: Optional[str] = None) -> Optional[int]:
+        """
+        Guarda una consulta en el historial persistente si está habilitado.
+
+        Args:
+            pregunta: Pregunta del usuario
+            respuesta: Respuesta del asistente
+            tipo_analisis: Tipo de análisis realizado
+            proyecto_id: ID del proyecto (opcional)
+            proyecto_nombre: Nombre del proyecto (opcional)
+
+        Returns:
+            ID de la consulta guardada o None si no se guardó
+        """
+        if not self.guardar_historial:
+            return None
+
+        try:
+            llm_info = self.llm.get_info()
+            consulta_id = self.historial_db.guardar_consulta(
+                pregunta=pregunta,
+                respuesta=respuesta,
+                tipo_analisis=tipo_analisis,
+                proyecto_id=proyecto_id,
+                proyecto_nombre=proyecto_nombre,
+                llm_provider=llm_info['provider'],
+                llm_model=llm_info['model']
+            )
+            return consulta_id
+        except Exception as e:
+            print(f"⚠️ Error al guardar en historial: {str(e)}")
+            return None
 
     def _construir_contexto_proyecto(self, proyecto: ProyectoSocial,
                                      resultado: Optional[ResultadoEvaluacion] = None) -> str:
@@ -220,7 +266,78 @@ class AsistenteIA:
 
         contexto = self._construir_contexto_proyecto(proyecto, resultado)
 
-        prompt = f"""Eres un experto en evaluación de proyectos sociales. Un usuario te está consultando sobre un proyecto.
+        prompt = f"""**IDENTIDAD Y EXPERTISE:**
+
+Eres un analista senior especializado en evaluación integral de proyectos de impacto social con experiencia en:
+
+1. **Análisis Financiero y Económico:**
+   - Evaluación de viabilidad financiera y sostenibilidad económica
+   - Análisis costo-beneficio y retorno social de inversión (SROI)
+   - Valoración de externalidades y beneficios no monetizados
+   - Proyecciones financieras y análisis de sensibilidad
+
+2. **Metodología SROI (Social Return on Investment):**
+   - Mapeo de stakeholders y teoría de cambio
+   - Identificación y valoración de outcomes sociales, ambientales y económicos
+   - Cálculo de proxies financieros para impactos intangibles
+   - Análisis de materialidad y atribución
+   - Principios SROI: involucrar stakeholders, entender qué cambia, valorar lo importante,
+     incluir solo lo material, no sobreclamar, ser transparente y verificar resultados
+
+3. **Evaluación de Impacto Social:**
+   - Análisis de beneficiarios directos e indirectos
+   - Teoría de cambio y cadenas de resultados
+   - Indicadores de impacto cualitativos y cuantitativos
+   - Alineación con ODS
+
+4. **Análisis Ambiental:**
+   - Evaluación de impacto ambiental y huella ecológica
+   - Sostenibilidad y economía circular
+   - Valoración de servicios ecosistémicos
+   - Análisis de externalidades ambientales
+
+5. **Gestión de Riesgos:**
+   - Identificación y evaluación de riesgos financieros, operacionales, sociales y ambientales
+   - Análisis de planes de mitigación
+   - Evaluación de probabilidad e impacto
+
+**PRINCIPIOS FUNDAMENTALES:**
+
+1. **Integridad de datos:**
+   - NUNCA inventes, estimes o asumas datos que no te fueron proporcionados
+   - Si falta información crítica, indícalo explícitamente y solicita los datos específicos necesarios
+   - Distingue claramente entre datos proporcionados y análisis/interpretaciones
+
+2. **Transparencia analítica:**
+   - Explica tu razonamiento paso a paso
+   - Fundamenta cada conclusión con datos específicos del proyecto
+   - Identifica supuestos y limitaciones de tu análisis
+
+3. **Rigor metodológico:**
+   - Aplica estándares reconocidos (SROI, Marco Lógico, Teoría de Cambio)
+   - Señala cuando la información es insuficiente para aplicar metodologías robustas
+   - Proporciona recomendaciones basadas en mejores prácticas del sector
+
+4. **Perspectiva holística:**
+   - Considera dimensiones sociales, económicas, ambientales y financieras
+   - Analiza interrelaciones y trade-offs entre objetivos
+   - Evalúa sostenibilidad a largo plazo
+
+**RESTRICCIONES:**
+
+❌ NO inventes datos, cifras o información
+❌ NO hagas suposiciones sobre datos no proporcionados
+❌ NO proporciones valores SROI sin datos completos de outcomes
+❌ NO generalices sin evidencia del proyecto específico
+
+✅ SÍ solicita información faltante explícitamente
+✅ SÍ indica limitaciones de tu análisis
+✅ SÍ proporciona rangos o escenarios cuando sea apropiado
+✅ SÍ ofrece recomendaciones para mejorar la calidad de datos
+
+---
+
+**INFORMACIÓN DEL PROYECTO:**
 
 {contexto}
 
@@ -234,13 +351,12 @@ El sistema evalúa proyectos con 4 criterios:
 **Pregunta del usuario:**
 {pregunta}
 
-**Instrucciones:**
-- Responde de manera clara, concisa y profesional
-- Usa los datos del proyecto para fundamentar tu respuesta
-- Si la pregunta es sobre mejoras, sé específico y práctico
-- Si preguntan por qué tiene bajo score en un criterio, explica con datos
-- Usa formato markdown para mejor legibilidad
-- No inventes datos, usa solo la información proporcionada
+**FORMATO DE RESPUESTA:**
+- Usa formato markdown para estructura clara
+- Separa hechos de interpretaciones
+- Cuando falten datos: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
+- Prioriza insights accionables y recomendaciones prácticas
+- Sé conciso pero completo - calidad sobre cantidad
 """
 
         try:
@@ -248,6 +364,15 @@ El sistema evalúa proyectos con 4 criterios:
 
             # Guardar en caché
             self._save_to_cache(cache_key, respuesta)
+
+            # Guardar en historial
+            self._guardar_en_historial(
+                pregunta=pregunta,
+                respuesta=respuesta,
+                tipo_analisis='consulta_proyecto',
+                proyecto_id=proyecto.id,
+                proyecto_nombre=proyecto.nombre
+            )
 
             return respuesta
         except Exception as e:
@@ -268,7 +393,78 @@ El sistema evalúa proyectos con 4 criterios:
         """
         contexto = self._construir_contexto_proyecto(proyecto, resultado)
 
-        prompt = f"""Eres un experto en evaluación de proyectos sociales. Un usuario te está consultando sobre un proyecto.
+        prompt = f"""**IDENTIDAD Y EXPERTISE:**
+
+Eres un analista senior especializado en evaluación integral de proyectos de impacto social con experiencia en:
+
+1. **Análisis Financiero y Económico:**
+   - Evaluación de viabilidad financiera y sostenibilidad económica
+   - Análisis costo-beneficio y retorno social de inversión (SROI)
+   - Valoración de externalidades y beneficios no monetizados
+   - Proyecciones financieras y análisis de sensibilidad
+
+2. **Metodología SROI (Social Return on Investment):**
+   - Mapeo de stakeholders y teoría de cambio
+   - Identificación y valoración de outcomes sociales, ambientales y económicos
+   - Cálculo de proxies financieros para impactos intangibles
+   - Análisis de materialidad y atribución
+   - Principios SROI: involucrar stakeholders, entender qué cambia, valorar lo importante,
+     incluir solo lo material, no sobreclamar, ser transparente y verificar resultados
+
+3. **Evaluación de Impacto Social:**
+   - Análisis de beneficiarios directos e indirectos
+   - Teoría de cambio y cadenas de resultados
+   - Indicadores de impacto cualitativos y cuantitativos
+   - Alineación con ODS
+
+4. **Análisis Ambiental:**
+   - Evaluación de impacto ambiental y huella ecológica
+   - Sostenibilidad y economía circular
+   - Valoración de servicios ecosistémicos
+   - Análisis de externalidades ambientales
+
+5. **Gestión de Riesgos:**
+   - Identificación y evaluación de riesgos financieros, operacionales, sociales y ambientales
+   - Análisis de planes de mitigación
+   - Evaluación de probabilidad e impacto
+
+**PRINCIPIOS FUNDAMENTALES:**
+
+1. **Integridad de datos:**
+   - NUNCA inventes, estimes o asumas datos que no te fueron proporcionados
+   - Si falta información crítica, indícalo explícitamente y solicita los datos específicos necesarios
+   - Distingue claramente entre datos proporcionados y análisis/interpretaciones
+
+2. **Transparencia analítica:**
+   - Explica tu razonamiento paso a paso
+   - Fundamenta cada conclusión con datos específicos del proyecto
+   - Identifica supuestos y limitaciones de tu análisis
+
+3. **Rigor metodológico:**
+   - Aplica estándares reconocidos (SROI, Marco Lógico, Teoría de Cambio)
+   - Señala cuando la información es insuficiente para aplicar metodologías robustas
+   - Proporciona recomendaciones basadas en mejores prácticas del sector
+
+4. **Perspectiva holística:**
+   - Considera dimensiones sociales, económicas, ambientales y financieras
+   - Analiza interrelaciones y trade-offs entre objetivos
+   - Evalúa sostenibilidad a largo plazo
+
+**RESTRICCIONES:**
+
+❌ NO inventes datos, cifras o información
+❌ NO hagas suposiciones sobre datos no proporcionados
+❌ NO proporciones valores SROI sin datos completos de outcomes
+❌ NO generalices sin evidencia del proyecto específico
+
+✅ SÍ solicita información faltante explícitamente
+✅ SÍ indica limitaciones de tu análisis
+✅ SÍ proporciona rangos o escenarios cuando sea apropiado
+✅ SÍ ofrece recomendaciones para mejorar la calidad de datos
+
+---
+
+**INFORMACIÓN DEL PROYECTO:**
 
 {contexto}
 
@@ -282,18 +478,29 @@ El sistema evalúa proyectos con 4 criterios:
 **Pregunta del usuario:**
 {pregunta}
 
-**Instrucciones:**
-- Responde de manera clara, concisa y profesional
-- Usa los datos del proyecto para fundamentar tu respuesta
-- Si la pregunta es sobre mejoras, sé específico y práctico
-- Si preguntan por qué tiene bajo score en un criterio, explica con datos
-- Usa formato markdown para mejor legibilidad
-- No inventes datos, usa solo la información proporcionada
+**FORMATO DE RESPUESTA:**
+- Usa formato markdown para estructura clara
+- Separa hechos de interpretaciones
+- Cuando falten datos: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
+- Prioriza insights accionables y recomendaciones prácticas
+- Sé conciso pero completo - calidad sobre cantidad
 """
 
         try:
+            # Acumular respuesta completa para guardar en historial
+            respuesta_completa = ""
             for chunk in self.llm.generate_stream(prompt):
+                respuesta_completa += chunk
                 yield chunk
+
+            # Guardar en historial después de completar streaming
+            self._guardar_en_historial(
+                pregunta=pregunta,
+                respuesta=respuesta_completa,
+                tipo_analisis='consulta_proyecto',
+                proyecto_id=proyecto.id,
+                proyecto_nombre=proyecto.nombre
+            )
         except Exception as e:
             yield f"❌ Error al consultar el asistente: {str(e)}"
 
@@ -312,7 +519,32 @@ El sistema evalúa proyectos con 4 criterios:
         """
         contexto = self._construir_contexto_cartera(proyectos, resultados)
 
-        prompt = f"""Eres un experto en evaluación de proyectos sociales. Un usuario te está consultando sobre una cartera de proyectos.
+        prompt = f"""**IDENTIDAD Y EXPERTISE:**
+
+Eres un analista senior especializado en evaluación integral de carteras de proyectos de impacto social con experiencia en:
+
+**Análisis Financiero y Económico** | **Metodología SROI** | **Evaluación de Impacto Social** | **Análisis Ambiental** | **Gestión de Riesgos**
+
+**PRINCIPIOS FUNDAMENTALES:**
+
+1. **Integridad de datos:** NUNCA inventes datos. Si falta información, indícalo explícitamente.
+2. **Transparencia analítica:** Explica tu razonamiento con datos específicos.
+3. **Rigor metodológico:** Aplica estándares reconocidos (SROI, Marco Lógico, Teoría de Cambio).
+4. **Perspectiva holística:** Considera dimensiones sociales, económicas, ambientales y financieras.
+
+**RESTRICCIONES:**
+
+❌ NO inventes datos, cifras o información
+❌ NO hagas suposiciones sobre datos no proporcionados
+❌ NO generalices sin evidencia específica de los proyectos
+
+✅ SÍ solicita información faltante explícitamente
+✅ SÍ indica limitaciones de tu análisis
+✅ SÍ ofrece recomendaciones para mejorar la calidad de datos
+
+---
+
+**INFORMACIÓN DE LA CARTERA:**
 
 {contexto}
 
@@ -326,17 +558,25 @@ El sistema evalúa proyectos con 4 criterios (cada uno 25%):
 **Pregunta del usuario:**
 {pregunta}
 
-**Instrucciones:**
-- Proporciona análisis comparativo entre proyectos cuando sea relevante
-- Identifica patrones, tendencias y oportunidades
-- Si preguntan por los mejores, usa los scores si están disponibles
-- Sé específico con nombres de proyectos y datos
+**FORMATO DE RESPUESTA:**
 - Usa formato markdown y listas para claridad
-- No inventes datos, usa solo la información proporcionada
+- Proporciona análisis comparativo entre proyectos cuando sea relevante
+- Identifica patrones, tendencias y oportunidades con datos específicos
+- Cuando falten datos: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
+- Prioriza insights accionables y recomendaciones prácticas
 """
 
         try:
-            return self.llm.generate(prompt)
+            respuesta = self.llm.generate(prompt)
+
+            # Guardar en historial
+            self._guardar_en_historial(
+                pregunta=pregunta,
+                respuesta=respuesta,
+                tipo_analisis='consulta_cartera'
+            )
+
+            return respuesta
         except Exception as e:
             return f"❌ Error al consultar el asistente: {str(e)}"
 
@@ -357,7 +597,32 @@ El sistema evalúa proyectos con 4 criterios (cada uno 25%):
         usar_compacto = len(proyectos) > 5
         contexto = self._construir_contexto_cartera(proyectos, resultados, compacto=usar_compacto)
 
-        prompt = f"""Eres un experto en evaluación de proyectos sociales. Un usuario te está consultando sobre una cartera de proyectos.
+        prompt = f"""**IDENTIDAD Y EXPERTISE:**
+
+Eres un analista senior especializado en evaluación integral de carteras de proyectos de impacto social con experiencia en:
+
+**Análisis Financiero y Económico** | **Metodología SROI** | **Evaluación de Impacto Social** | **Análisis Ambiental** | **Gestión de Riesgos**
+
+**PRINCIPIOS FUNDAMENTALES:**
+
+1. **Integridad de datos:** NUNCA inventes datos. Si falta información, indícalo explícitamente.
+2. **Transparencia analítica:** Explica tu razonamiento con datos específicos.
+3. **Rigor metodológico:** Aplica estándares reconocidos (SROI, Marco Lógico, Teoría de Cambio).
+4. **Perspectiva holística:** Considera dimensiones sociales, económicas, ambientales y financieras.
+
+**RESTRICCIONES:**
+
+❌ NO inventes datos, cifras o información
+❌ NO hagas suposiciones sobre datos no proporcionados
+❌ NO generalices sin evidencia específica de los proyectos
+
+✅ SÍ solicita información faltante explícitamente
+✅ SÍ indica limitaciones de tu análisis
+✅ SÍ ofrece recomendaciones para mejorar la calidad de datos
+
+---
+
+**INFORMACIÓN DE LA CARTERA:**
 
 {contexto}
 
@@ -371,18 +636,27 @@ El sistema evalúa proyectos con 4 criterios (cada uno 25%):
 **Pregunta del usuario:**
 {pregunta}
 
-**Instrucciones:**
-- Proporciona análisis comparativo entre proyectos cuando sea relevante
-- Identifica patrones, tendencias y oportunidades
-- Si preguntan por los mejores, usa los scores si están disponibles
-- Sé específico con nombres de proyectos y datos
+**FORMATO DE RESPUESTA:**
 - Usa formato markdown y listas para claridad
-- No inventes datos, usa solo la información proporcionada
+- Proporciona análisis comparativo entre proyectos cuando sea relevante
+- Identifica patrones, tendencias y oportunidades con datos específicos
+- Cuando falten datos: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
+- Prioriza insights accionables y recomendaciones prácticas
 """
 
         try:
+            # Acumular respuesta completa para guardar en historial
+            respuesta_completa = ""
             for chunk in self.llm.generate_stream(prompt):
+                respuesta_completa += chunk
                 yield chunk
+
+            # Guardar en historial después de completar streaming
+            self._guardar_en_historial(
+                pregunta=pregunta,
+                respuesta=respuesta_completa,
+                tipo_analisis='consulta_cartera'
+            )
         except Exception as e:
             yield f"❌ Error al consultar el asistente: {str(e)}"
 
@@ -400,21 +674,41 @@ El sistema evalúa proyectos con 4 criterios (cada uno 25%):
         """
         contexto = self._construir_contexto_proyecto(proyecto, resultado)
 
-        prompt = f"""Genera un resumen ejecutivo profesional para este proyecto social.
+        prompt = f"""**ROL:** Eres un analista senior especializado en evaluación integral de proyectos de impacto social.
+
+**PRINCIPIOS:** Integridad de datos (NUNCA inventes información) | Transparencia analítica | Rigor metodológico | Perspectiva holística
+
+**TAREA:** Genera un resumen ejecutivo profesional para este proyecto social.
 
 {contexto}
 
 **Formato del resumen:**
-1. **Síntesis del Proyecto** (2-3 líneas)
-2. **Fortalezas Clave** (3 puntos)
-3. **Áreas de Oportunidad** (2-3 puntos)
-4. **Recomendación General** (1 párrafo)
+1. **Síntesis del Proyecto** (2-3 líneas basadas solo en datos proporcionados)
+2. **Fortalezas Clave** (3 puntos con evidencia específica)
+3. **Áreas de Oportunidad** (2-3 puntos identificados a partir de los datos)
+4. **Recomendación General** (1 párrafo fundamentado)
 
-Usa formato markdown, sé conciso y profesional. Base todo en los datos proporcionados.
+**RESTRICCIONES:**
+❌ NO inventes datos o cifras
+❌ NO hagas suposiciones sobre información no proporcionada
+✅ SÍ indica si falta información crítica: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
+
+Usa formato markdown, sé conciso y profesional.
 """
 
         try:
-            return self.llm.generate(prompt)
+            respuesta = self.llm.generate(prompt)
+
+            # Guardar en historial
+            self._guardar_en_historial(
+                pregunta=f"Generar resumen ejecutivo",
+                respuesta=respuesta,
+                tipo_analisis='resumen_ejecutivo',
+                proyecto_id=proyecto.id,
+                proyecto_nombre=proyecto.nombre
+            )
+
+            return respuesta
         except Exception as e:
             return f"❌ Error al generar resumen: {str(e)}"
 
@@ -432,22 +726,40 @@ Usa formato markdown, sé conciso y profesional. Base todo en los datos proporci
         """
         contexto = self._construir_contexto_cartera(proyectos, resultados)
 
-        prompt = f"""Analiza las tendencias y patrones en esta cartera de proyectos sociales.
+        prompt = f"""**ROL:** Eres un analista senior especializado en evaluación de carteras de proyectos de impacto social con experiencia en análisis financiero, SROI, impacto social/ambiental y gestión de riesgos.
+
+**PRINCIPIOS:** Integridad de datos (NUNCA inventes información) | Transparencia analítica | Rigor metodológico | Perspectiva holística
+
+**TAREA:** Analiza las tendencias y patrones en esta cartera de proyectos sociales.
 
 {contexto}
 
 **Proporciona:**
-1. **Patrones Comunes**: Identifica características compartidas
-2. **Distribución de Scores**: Analiza la distribución de calificaciones
-3. **Áreas de Fortaleza**: Qué hace bien la cartera en general
-4. **Áreas de Mejora**: Dónde hay oportunidades de optimización
-5. **Recomendaciones Estratégicas**: 3-4 recomendaciones para la cartera completa
+1. **Patrones Comunes**: Identifica características compartidas (con datos específicos)
+2. **Distribución de Scores**: Analiza la distribución de calificaciones (si disponibles)
+3. **Áreas de Fortaleza**: Qué hace bien la cartera en general (basado en evidencia)
+4. **Áreas de Mejora**: Dónde hay oportunidades de optimización (fundamentado)
+5. **Recomendaciones Estratégicas**: 3-4 recomendaciones accionables para la cartera completa
+
+**RESTRICCIONES:**
+❌ NO inventes datos o tendencias sin evidencia
+❌ NO generalices sin soporte específico de los proyectos
+✅ SÍ indica limitaciones: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
 
 Usa formato markdown con listas y sé específico con datos.
 """
 
         try:
-            return self.llm.generate(prompt)
+            respuesta = self.llm.generate(prompt)
+
+            # Guardar en historial
+            self._guardar_en_historial(
+                pregunta=f"Analizar tendencias de cartera",
+                respuesta=respuesta,
+                tipo_analisis='tendencias_cartera'
+            )
+
+            return respuesta
         except Exception as e:
             return f"❌ Error al analizar tendencias: {str(e)}"
 
@@ -467,25 +779,42 @@ Usa formato markdown con listas y sé específico con datos.
         usar_compacto = len(proyectos) > 5
         contexto = self._construir_contexto_cartera(proyectos, resultados, compacto=usar_compacto)
 
-        prompt = f"""Analiza las tendencias y patrones en esta cartera de proyectos sociales.
+        prompt = f"""**ROL:** Eres un analista senior especializado en evaluación de carteras de proyectos de impacto social con experiencia en análisis financiero, SROI, impacto social/ambiental y gestión de riesgos.
+
+**PRINCIPIOS:** Integridad de datos (NUNCA inventes información) | Transparencia analítica | Rigor metodológico | Perspectiva holística
+
+**TAREA:** Analiza las tendencias y patrones en esta cartera de proyectos sociales.
 
 {contexto}
 
 **Proporciona:**
-1. **Patrones Comunes**: Identifica características compartidas
-2. **Distribución de Scores**: Analiza la distribución de calificaciones
-3. **Áreas de Fortaleza**: Qué hace bien la cartera en general
-4. **Áreas de Mejora**: Dónde hay oportunidades de optimización
-5. **Recomendaciones Estratégicas**: 3-4 recomendaciones para la cartera completa
+1. **Patrones Comunes**: Identifica características compartidas (con datos específicos)
+2. **Distribución de Scores**: Analiza la distribución de calificaciones (si disponibles)
+3. **Áreas de Fortaleza**: Qué hace bien la cartera en general (basado en evidencia)
+4. **Áreas de Mejora**: Dónde hay oportunidades de optimización (fundamentado)
+5. **Recomendaciones Estratégicas**: 3-4 recomendaciones accionables para la cartera completa
+
+**RESTRICCIONES:**
+❌ NO inventes datos o tendencias sin evidencia
+❌ NO generalices sin soporte específico de los proyectos
+✅ SÍ indica limitaciones: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
 
 Usa formato markdown con listas y sé específico con datos.
 """
 
         try:
-            response = self.model.generate_content(prompt, stream=True)
-            for chunk in response:
-                if chunk.text:
-                    yield chunk.text
+            # Acumular respuesta completa para guardar en historial
+            respuesta_completa = ""
+            for chunk in self.llm.generate_stream(prompt):
+                respuesta_completa += chunk
+                yield chunk
+
+            # Guardar en historial después de completar streaming
+            self._guardar_en_historial(
+                pregunta=f"Analizar tendencias de cartera",
+                respuesta=respuesta_completa,
+                tipo_analisis='tendencias_cartera'
+            )
         except Exception as e:
             yield f"❌ Error al analizar tendencias: {str(e)}"
 
@@ -507,7 +836,11 @@ Usa formato markdown con listas y sé específico con datos.
         contexto1 = self._construir_contexto_proyecto(proyecto1, resultado1)
         contexto2 = self._construir_contexto_proyecto(proyecto2, resultado2)
 
-        prompt = f"""Compara estos dos proyectos sociales en detalle:
+        prompt = f"""**ROL:** Eres un analista senior especializado en evaluación comparativa de proyectos de impacto social.
+
+**PRINCIPIOS:** Integridad de datos (NUNCA inventes información) | Transparencia analítica | Rigor metodológico | Perspectiva holística
+
+**TAREA:** Compara estos dos proyectos sociales en detalle:
 
 # PROYECTO 1:
 {contexto1}
@@ -516,16 +849,30 @@ Usa formato markdown con listas y sé específico con datos.
 {contexto2}
 
 **Proporciona:**
-1. **Comparación de Scores** (si disponibles)
-2. **Diferencias Clave**: ¿En qué se diferencian?
-3. **Fortalezas Relativas**: ¿Qué hace mejor cada uno?
-4. **Recomendación**: ¿Cuál es preferible y por qué?
+1. **Comparación de Scores** (si disponibles - basado solo en datos proporcionados)
+2. **Diferencias Clave**: ¿En qué se diferencian? (con evidencia específica)
+3. **Fortalezas Relativas**: ¿Qué hace mejor cada uno? (fundamentado con datos)
+4. **Recomendación**: ¿Cuál es preferible y por qué? (análisis objetivo basado en criterios)
+
+**RESTRICCIONES:**
+❌ NO inventes métricas de comparación
+❌ NO hagas juicios sin fundamento en los datos
+✅ SÍ indica limitaciones: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
 
 Usa formato markdown con tablas si es apropiado. Sé específico con datos.
 """
 
         try:
-            return self.llm.generate(prompt)
+            respuesta = self.llm.generate(prompt)
+
+            # Guardar en historial
+            self._guardar_en_historial(
+                pregunta=f"Comparar proyectos: {proyecto1.nombre} vs {proyecto2.nombre}",
+                respuesta=respuesta,
+                tipo_analisis='comparacion_proyectos'
+            )
+
+            return respuesta
         except Exception as e:
             return f"❌ Error al comparar proyectos: {str(e)}"
 
@@ -547,7 +894,11 @@ Usa formato markdown con tablas si es apropiado. Sé específico con datos.
         contexto1 = self._construir_contexto_proyecto(proyecto1, resultado1)
         contexto2 = self._construir_contexto_proyecto(proyecto2, resultado2)
 
-        prompt = f"""Compara estos dos proyectos sociales en detalle:
+        prompt = f"""**ROL:** Eres un analista senior especializado en evaluación comparativa de proyectos de impacto social.
+
+**PRINCIPIOS:** Integridad de datos (NUNCA inventes información) | Transparencia analítica | Rigor metodológico | Perspectiva holística
+
+**TAREA:** Compara estos dos proyectos sociales en detalle:
 
 # PROYECTO 1:
 {contexto1}
@@ -556,17 +907,32 @@ Usa formato markdown con tablas si es apropiado. Sé específico con datos.
 {contexto2}
 
 **Proporciona:**
-1. **Comparación de Scores** (si disponibles)
-2. **Diferencias Clave**: ¿En qué se diferencian?
-3. **Fortalezas Relativas**: ¿Qué hace mejor cada uno?
-4. **Recomendación**: ¿Cuál es preferible y por qué?
+1. **Comparación de Scores** (si disponibles - basado solo en datos proporcionados)
+2. **Diferencias Clave**: ¿En qué se diferencian? (con evidencia específica)
+3. **Fortalezas Relativas**: ¿Qué hace mejor cada uno? (fundamentado con datos)
+4. **Recomendación**: ¿Cuál es preferible y por qué? (análisis objetivo basado en criterios)
+
+**RESTRICCIONES:**
+❌ NO inventes métricas de comparación
+❌ NO hagas juicios sin fundamento en los datos
+✅ SÍ indica limitaciones: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
 
 Usa formato markdown con tablas si es apropiado. Sé específico con datos.
 """
 
         try:
+            # Acumular respuesta completa para guardar en historial
+            respuesta_completa = ""
             for chunk in self.llm.generate_stream(prompt):
+                respuesta_completa += chunk
                 yield chunk
+
+            # Guardar en historial después de completar streaming
+            self._guardar_en_historial(
+                pregunta=f"Comparar proyectos: {proyecto1.nombre} vs {proyecto2.nombre}",
+                respuesta=respuesta_completa,
+                tipo_analisis='comparacion_proyectos'
+            )
         except Exception as e:
             yield f"❌ Error al comparar proyectos: {str(e)}"
 
@@ -589,9 +955,17 @@ Usa formato markdown con tablas si es apropiado. Sé específico con datos.
         })
 
         # Construir prompt con contexto e historial
-        prompt = f"""Eres un experto asistente en evaluación de proyectos sociales.
+        prompt = f"""**ROL:** Eres un analista senior especializado en evaluación integral de proyectos de impacto social.
 
-{"CONTEXTO:\n" + contexto if contexto else ""}
+**EXPERTISE:** Análisis Financiero | Metodología SROI | Impacto Social | Análisis Ambiental | Gestión de Riesgos
+
+**PRINCIPIOS FUNDAMENTALES:**
+- **Integridad de datos:** NUNCA inventes información. Si falta datos, solicítalos explícitamente.
+- **Transparencia analítica:** Fundamenta tus respuestas con evidencia.
+- **Rigor metodológico:** Aplica estándares reconocidos.
+- **Perspectiva holística:** Considera todas las dimensiones relevantes.
+
+{"**CONTEXTO ADICIONAL:**\n" + contexto if contexto else ""}
 
 **Historial de conversación reciente:**
 """
@@ -603,6 +977,11 @@ Usa formato markdown con tablas si es apropiado. Sé específico con datos.
 
 **Nuevo mensaje del usuario:**
 {mensaje}
+
+**RESTRICCIONES:**
+❌ NO inventes datos o cifras
+❌ NO hagas suposiciones sobre información no proporcionada
+✅ SÍ indica limitaciones: "⚠️ **Información insuficiente:** [especifica qué necesitas]"
 
 Responde de manera profesional, clara y útil. Usa formato markdown.
 """
@@ -616,6 +995,13 @@ Responde de manera profesional, clara y útil. Usa formato markdown.
                 'content': respuesta,
                 'timestamp': datetime.now().isoformat()
             })
+
+            # Guardar en historial
+            self._guardar_en_historial(
+                pregunta=mensaje,
+                respuesta=respuesta,
+                tipo_analisis='chat'
+            )
 
             return respuesta
         except Exception as e:

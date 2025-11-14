@@ -9,6 +9,9 @@ def show():
     """Muestra la página del Asistente IA."""
     st.markdown("### 🤖 Asistente IA - Análisis Inteligente de Proyectos")
 
+    # Info sobre historial
+    st.info("💡 **Tip:** Todos tus análisis se guardan automáticamente. Visita **📖 Historial IA** en el menú para ver, buscar y exportar tus consultas anteriores.")
+
     # Botones de control
     col1, col2, col3 = st.columns([5, 1, 1])
     with col2:

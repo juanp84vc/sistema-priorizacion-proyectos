@@ -4,9 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -23,14 +20,11 @@ wheels/
 .installed.cfg
 *.egg
 
-# Base de datos local (contiene datos de proyectos locales)
-data/
-*.db
-*.sqlite
-*.sqlite3
-
-# Streamlit
-.streamlit/
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
 
 # IDE
 .vscode/
@@ -39,15 +33,35 @@ data/
 *.swo
 *~
 
-# macOS
-.DS_Store
+# Environment variables - NUNCA subir API keys!
+.env
+.env.local
+.env.*.local
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
 
 # Logs
 *.log
+logs/
 
-# Backups
-backups/
-*.bak
+# OS
+.DS_Store
+Thumbs.db
 
-# Environment variables (API keys)
-.env
+# Exports
+exports/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints
