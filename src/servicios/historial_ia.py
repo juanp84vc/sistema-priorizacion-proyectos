@@ -1,124 +1,32 @@
 """
 Servicio de almacenamiento y gestión del historial de consultas IA.
-Soporta SQLite (local) y PostgreSQL (producción).
+Usa SQLite para persistencia local.
 """
 import sqlite3
 from datetime import datetime
 from typing import List, Dict, Optional
 from pathlib import Path
 
-# Intentar importar streamlit para acceso a secrets
-try:
-    import streamlit as st
-    STREAMLIT_AVAILABLE = True
-except ImportError:
-    STREAMLIT_AVAILABLE = False
-
-# Intentar importar psycopg2 para PostgreSQL
-try:
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-    POSTGRES_AVAILABLE = True
-except ImportError:
-    POSTGRES_AVAILABLE = False
-
 
 class HistorialIA:
     """Gestiona el almacenamiento persistente de consultas y respuestas del asistente IA."""
 
-    def __init__(self, db_path: Optional[str] = None, connection_string: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None):
         """
-        Inicializa el servicio de historial.
-        Detecta automáticamente si usar PostgreSQL (producción) o SQLite (local).
+        Inicializa el servicio de historial con SQLite.
 
         Args:
-            db_path: Ruta a la base de datos SQLite (solo para local)
-            connection_string: Cadena de conexión PostgreSQL (opcional)
+            db_path: Ruta a la base de datos SQLite (opcional)
         """
-        # Determinar si usar PostgreSQL o SQLite
-        self.use_postgres = False
-        self.connection_string = connection_string
+        if db_path is None:
+            data_dir = Path(__file__).parent.parent.parent / 'data'
+            data_dir.mkdir(exist_ok=True)
+            db_path = data_dir / 'historial_ia.db'
 
-        # Intentar usar PostgreSQL si está disponible en Streamlit secrets
-        if connection_string is None and STREAMLIT_AVAILABLE:
-            try:
-                if 'postgres' in st.secrets and 'connection_string_historial' in st.secrets['postgres']:
-                    self.connection_string = st.secrets['postgres']['connection_string_historial']
-                    self.use_postgres = True
-            except:
-                pass
+        self.db_path = str(db_path)
+        self._inicializar_db()
 
-        if self.connection_string:
-            self.use_postgres = True
-
-        if self.use_postgres and not POSTGRES_AVAILABLE:
-            print("⚠️ PostgreSQL configurado pero psycopg2 no disponible, usando SQLite")
-            self.use_postgres = False
-
-        # Configurar base de datos según tipo
-        if self.use_postgres:
-            self.conn_pool = None
-            print("✅ HistorialIA usando PostgreSQL (producción)")
-            self._inicializar_db_postgres()
-        else:
-            # SQLite para local
-            if db_path is None:
-                data_dir = Path(__file__).parent.parent.parent / 'data'
-                data_dir.mkdir(exist_ok=True)
-                db_path = data_dir / 'historial_ia.db'
-            self.db_path = str(db_path)
-            print("✅ HistorialIA usando SQLite (local)")
-            self._inicializar_db_sqlite()
-
-    def _get_postgres_connection(self):
-        """Obtiene una conexión PostgreSQL."""
-        return psycopg2.connect(self.connection_string)
-
-    def _inicializar_db_postgres(self):
-        """Crea las tablas necesarias en PostgreSQL si no existen."""
-        conn = self._get_postgres_connection()
-        try:
-            cursor = conn.cursor()
-
-            # Tabla principal de consultas
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS consultas_ia (
-                    id SERIAL PRIMARY KEY,
-                    timestamp TIMESTAMP NOT NULL,
-                    proyecto_id TEXT,
-                    proyecto_nombre TEXT,
-                    tipo_analisis TEXT NOT NULL,
-                    pregunta TEXT NOT NULL,
-                    respuesta TEXT NOT NULL,
-                    llm_provider TEXT,
-                    llm_model TEXT,
-                    usuario TEXT,
-                    metadata TEXT
-                )
-            ''')
-
-            # Índices para búsquedas rápidas
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_proyecto_id
-                ON consultas_ia(proyecto_id)
-            ''')
-
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_timestamp
-                ON consultas_ia(timestamp DESC)
-            ''')
-
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_tipo_analisis
-                ON consultas_ia(tipo_analisis)
-            ''')
-
-            conn.commit()
-        finally:
-            cursor.close()
-            conn.close()
-
-    def _inicializar_db_sqlite(self):
+    def _inicializar_db(self):
         """Crea las tablas necesarias en SQLite si no existen."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -186,46 +94,24 @@ class HistorialIA:
         Returns:
             ID de la consulta guardada
         """
-        if self.use_postgres:
-            conn = self._get_postgres_connection()
-            try:
-                cursor = conn.cursor()
-                timestamp = datetime.now()
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
 
-                cursor.execute('''
-                    INSERT INTO consultas_ia
-                    (timestamp, proyecto_id, proyecto_nombre, tipo_analisis, pregunta,
-                     respuesta, llm_provider, llm_model, usuario, metadata)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                ''', (timestamp, proyecto_id, proyecto_nombre, tipo_analisis, pregunta,
-                      respuesta, llm_provider, llm_model, usuario, metadata))
+        timestamp = datetime.now().isoformat()
 
-                consulta_id = cursor.fetchone()[0]
-                conn.commit()
-                return consulta_id
-            finally:
-                cursor.close()
-                conn.close()
-        else:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO consultas_ia
+            (timestamp, proyecto_id, proyecto_nombre, tipo_analisis, pregunta,
+             respuesta, llm_provider, llm_model, usuario, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (timestamp, proyecto_id, proyecto_nombre, tipo_analisis, pregunta,
+              respuesta, llm_provider, llm_model, usuario, metadata))
 
-            timestamp = datetime.now().isoformat()
+        consulta_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
 
-            cursor.execute('''
-                INSERT INTO consultas_ia
-                (timestamp, proyecto_id, proyecto_nombre, tipo_analisis, pregunta,
-                 respuesta, llm_provider, llm_model, usuario, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (timestamp, proyecto_id, proyecto_nombre, tipo_analisis, pregunta,
-                  respuesta, llm_provider, llm_model, usuario, metadata))
-
-            consulta_id = cursor.lastrowid
-            conn.commit()
-            conn.close()
-
-            return consulta_id
+        return consulta_id
 
     def obtener_consulta(self, consulta_id: int) -> Optional[Dict]:
         """
