@@ -317,3 +317,39 @@ Las tablas ya están creadas en Supabase. El sistema debería funcionar automát
 ---
 
 **Estado:** ✅ **PROBLEMA RESUELTO** - Sistema con persistencia real en PostgreSQL/Supabase funcionando correctamente.
+
+---
+
+## 🎯 DECISIÓN FINAL - Mantener SQLite
+
+### Realidad Aceptada
+Después de toda la sesión intentando PostgreSQL:
+- ✅ SQLite funciona perfectamente
+- ✅ Proyectos se recuperaron (2 proyectos de ayer)
+- ✅ Sistema estable y funcional
+- ⏳ PostgreSQL es nice-to-have, no must-have
+
+### Decisión Estratégica
+MANTENER SQLite y enfocarse en features de valor.
+
+PostgreSQL queda como:
+- Documentado para implementación futura
+- No crítico para MVP
+- Tabla en Supabase existe (lista para cuando se necesite)
+
+### Próxima Sesión
+Focus en agregar valor:
+- Nuevos criterios de evaluación
+- Mejoras de UI/UX
+- Exportación avanzada
+- Análisis comparativos
+
+### Aprendizajes Clave
+1. SQLite es suficiente para demos y pruebas
+2. Infraestructura perfecta < Features útiles
+3. Ship value first, optimize later
+4. Exportación manual es válida para MVP
+
+---
+
+**Decisión Final:** Mantener SQLite para MVP, PostgreSQL documentado para escalamiento futuro.
