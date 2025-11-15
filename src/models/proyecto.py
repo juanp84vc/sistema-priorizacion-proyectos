@@ -3,7 +3,7 @@ Modelos de dominio para proyectos sociales.
 SRP: Cada modelo tiene una responsabilidad clara.
 """
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import List, Dict, Optional
 from enum import Enum
 
 
@@ -46,8 +46,22 @@ class ProyectoSocial:
     municipios: List[str] = field(default_factory=list)
     estado: EstadoProyecto = EstadoProyecto.PROPUESTA
 
+    # NUEVO: Sectores del proyecto (para matriz PDET/ZOMAC)
+    sectores: List[str] = field(default_factory=list)
+    # Ejemplo: ["Educación", "Salud", "Infraestructura Rural"]
+
     # Indicadores específicos
     indicadores_impacto: Dict[str, float] = field(default_factory=dict)
+
+    # NUEVO: Puntajes PDET calculados automáticamente
+    puntajes_pdet: Dict[str, int] = field(default_factory=dict)
+    # Ejemplo: {"Educación": 6, "Salud": 3, "Infraestructura Rural": 9}
+
+    # NUEVO: Indicador si tiene municipios PDET
+    tiene_municipios_pdet: bool = False
+
+    # NUEVO: Puntaje máximo sectorial (calculado)
+    puntaje_sectorial_max: Optional[int] = None
 
     # Metadata
     fecha_presentacion: str = ""
