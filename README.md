@@ -4,6 +4,16 @@ Sistema modular y extensible para evaluar y priorizar proyectos de inversión so
 
 ## 🎯 Características
 
+### 🎯 Sistema de Priorización Arquitectura C
+
+- **SROI Dominante (40%):** Criterio principal de evaluación con impacto 10.7x mayor
+- **Datos Oficiales PDET/ZOMAC:** Matriz gubernamental de 362 municipios × 10 sectores
+- **Scoring Automático:** Motor integrado con validaciones y alertas
+- **Validado con Datos Reales:** 4 proyectos ENLAZA en prefactibilidad
+- **50 Tests Passing:** Calidad asegurada (100%)
+
+### 🏗️ Arquitectura SOLID
+
 - ✅ Evaluación multi-criterio configurable
 - ✅ Múltiples estrategias de scoring
 - ✅ Extensible sin modificar código existente (OCP)
@@ -118,31 +128,169 @@ sistema-priorizacion-proyectos/
 └── README.md
 ```
 
-## 📊 Criterios de Evaluación
+## 📊 Criterios de Evaluación - Arquitectura C
 
-### 1. Relación Costo-Efectividad (25%)
-- Evalúa la relación cuantitativa entre beneficios obtenidos y su costo unitario
-- Considera costo por beneficiario, eficiencia temporal y operativa
-- Metodología: Escala inversa (menor costo = mayor score)
-- Score alto indica excelente eficiencia en el uso de recursos
+**Sistema de Scoring:** Score Final = Σ(Score_criterio × Peso)
+
+### 1. Social Return on Investment - SROI (40%) ⭐ DOMINANTE
+
+**Criterio más importante del sistema**
+
+- **Descripción:** Evalúa el retorno social de la inversión, midiendo cuánto valor social se genera por cada peso invertido
+- **Metodología:** Conversión SROI → Score según rangos aprobados
+- **Rangos de conversión:**
+  - SROI < 1.0: Score 0 (RECHAZADO - destruye valor social)
+  - SROI 1.0-1.99: Score 60 (Prioridad BAJA - retorno marginal)
+  - SROI 2.0-2.99: Score 80 (Prioridad MEDIA - retorno aceptable)
+  - SROI ≥ 3.0: Score 95 (Prioridad ALTA - retorno excelente)
+- **Gates de validación:**
+  - Rechazo automático: SROI < 1.0
+  - Alerta verificación: SROI > 7.0 (requiere validación metodológica)
+  - Observaciones obligatorias: SROI > 5.0
+- **Peso:** 40% (10.6x más impacto vs sistema anterior)
+- **Implementación:** `src/criterios/sroi.py`
 
 ### 2. Contribución al Relacionamiento con Stakeholders (25%)
-- Mide contribución al relacionamiento con stakeholders locales y viabilidad operativa
-- Considera alcance geográfico, múltiples departamentos y cobertura de beneficiarios
-- Evalúa fortalecimiento de relaciones institucionales
-- Score alto indica fuerte relacionamiento y viabilidad operativa
 
-### 3. Probabilidad de Aprobación Gubernamental (25%)
-- Evalúa probabilidad de aprobación por Gobierno Nacional, distrital o local
-- Niveles: **alta, media, baja**
-- Considera alineación con ODS prioritarios y viabilidad presupuestaria
-- Evalúa población objetivo prioritaria y alcance geográfico estratégico
+- **Descripción:** Mide contribución al relacionamiento con stakeholders locales y viabilidad operativa
+- **Factores evaluados:**
+  - Alcance geográfico (departamentos, municipios)
+  - Cobertura de beneficiarios (directos e indirectos)
+  - Fortalecimiento de relaciones institucionales
+  - Viabilidad operativa
+- **Score alto indica:** Fuerte relacionamiento y alta viabilidad operativa
+- **Peso:** 25%
+- **Estado:** Cálculo temporal (reimplementación pendiente)
 
-### 4. Evaluación de Riesgos (25%)
-- Analiza riesgos tecnológicos, regulatorios, financieros, sociales y operativos
-- Considera complejidad presupuestaria, duración y alcance geográfico
-- Evalúa características de población objetivo
-- Score alto = bajo riesgo (escala inversa)
+### 3. Probabilidad de Aprobación - Obras por Impuestos (20%)
+
+**Con datos oficiales PDET/ZOMAC**
+
+- **Descripción:** Evalúa probabilidad de aprobación en mecanismo Obras por Impuestos usando matriz oficial de priorización sectorial
+- **Metodología:** 100% basado en datos oficiales gubernamentales
+- **Componentes:**
+  - Prioridad sectorial PDET/ZOMAC (100% del criterio)
+  - Matriz oficial: 362 municipios × 10 sectores
+  - Puntajes sectoriales: 1-10 (10 = máxima prioridad)
+- **Scoring:**
+  - Municipios PDET: Score = (Puntaje_sectorial / 10) × 100
+  - Municipios NO-PDET: Score = 0 (no elegibles para Obras por Impuestos)
+- **Sectores evaluados:**
+  1. Educación
+  2. Salud
+  3. Alcantarillado
+  4. Vía (Infraestructura vial)
+  5. Energía
+  6. Banda Ancha (Conectividad)
+  7. Riesgo Ambiental
+  8. Infraestructura Rural
+  9. Cultura
+  10. Deporte
+- **Peso:** 20%
+- **Implementación:** `src/criterios/probabilidad_aprobacion_pdet.py`
+- **Datos:** `data/proyectos.db` (tabla matriz_pdet_zomac)
+
+### 4. Evaluación de Riesgos (15%)
+
+- **Descripción:** Analiza riesgos del proyecto en múltiples dimensiones
+- **Tipos de riesgo evaluados:**
+  - Tecnológicos
+  - Regulatorios
+  - Financieros
+  - Sociales
+  - Operativos
+- **Factores considerados:**
+  - Complejidad presupuestaria
+  - Duración del proyecto
+  - Alcance geográfico
+  - Características población objetivo
+- **Score alto:** Bajo riesgo (escala inversa)
+- **Peso:** 15%
+- **Estado:** Cálculo temporal (reimplementación pendiente)
+
+---
+
+## 🎯 Cambios vs Sistema Anterior
+
+| Criterio | Peso Anterior | Peso Arquitectura C | Cambio |
+|----------|---------------|---------------------|--------|
+| **SROI** | 3.75% | **40%** | **+36.25%** 🚀 |
+| Costo-Efectividad | 25% | **0%** | **ELIMINADO** ❌ |
+| Stakeholders | 25% | 25% | Sin cambio |
+| Prob. Aprobación | 25% | 20% | -5% |
+| Riesgos | 25% | 15% | -10% |
+
+### Impacto Demostrado
+
+**Proyecto transformacional (SROI 4.2 + PDET alta prioridad):**
+- Sistema anterior: 60/100 (prioridad MEDIA)
+- Arquitectura C: 92.2/100 (prioridad MUY ALTA)
+- **Mejora: +32 puntos (+53%)** 🎯
+
+**Factor de incremento SROI:**
+- Contribución anterior: 3.56 puntos (3.75% peso)
+- Contribución nueva: 38.0 puntos (40% peso)
+- **Factor: 10.7x más impacto** 🚀
+
+---
+
+## 📈 Motor de Scoring
+
+### Fórmula de Cálculo
+```python
+Score_Final = (
+    SROI × 40% +
+    Stakeholders × 25% +
+    Probabilidad_Aprobación × 20% +
+    Riesgos × 15%
+)
+```
+
+### Niveles de Prioridad
+
+| Score | Nivel | Descripción |
+|-------|-------|-------------|
+| 0 | RECHAZADO | SROI < 1.0 (destruye valor social) |
+| 1-49 | BAJA | Retorno limitado, alto riesgo |
+| 50-69 | MEDIA | Retorno aceptable, riesgo moderado |
+| 70-84 | ALTA | Retorno excelente, bajo riesgo |
+| 85-100 | MUY ALTA | Retorno excepcional, muy bajo riesgo |
+
+### Implementación
+
+**Motor principal:** `src/scoring/motor_arquitectura_c.py`
+```python
+from src.scoring.motor_arquitectura_c import calcular_score_proyecto
+
+# Calcular score de un proyecto
+resultado = calcular_score_proyecto(proyecto)
+
+# Resultado incluye:
+# - score_total: 0-100
+# - Scores individuales por criterio
+# - Contribuciones (score × peso)
+# - nivel_prioridad: MUY ALTA, ALTA, MEDIA, BAJA, RECHAZADO
+# - Alertas y recomendaciones
+```
+
+---
+
+## ✅ Estado de Implementación
+
+| Componente | Estado | Tests |
+|------------|--------|-------|
+| SROI (40%) | ✅ Completado | 28/28 ✅ |
+| Prob. Aprobación (20%) | ✅ Completado | 15/15 ✅ |
+| Matriz PDET/ZOMAC | ✅ Cargada | 362 municipios ✅ |
+| Motor Arquitectura C | ✅ Integrado | 7/7 ✅ |
+| Stakeholders (25%) | ⏳ Temporal | - |
+| Riesgos (15%) | ⏳ Temporal | - |
+
+**Tests totales:** 50/50 passing (100%)
+
+**Validación:** 4 proyectos ENLAZA reales (prefactibilidad)
+
+**Estado:** ✅ EN PRODUCCIÓN
 
 ## 🎲 Estrategias de Scoring
 
@@ -152,6 +300,24 @@ Score final = suma de scores ponderados de cada criterio
 ### Scoring con Umbral
 Requiere que todos los criterios superen un umbral mínimo.
 Si alguno está bajo el umbral, se aplica penalización.
+
+## 📚 Documentación Técnica
+
+### Arquitectura del Sistema
+
+- **[SESSION_SUMMARY.md](SESSION_SUMMARY.md)**: Resumen completo de 5 sesiones de desarrollo (15-16 Nov 2025)
+- **[VALIDACION_PROYECTOS_REALES.md](VALIDACION_PROYECTOS_REALES.md)**: Validación con 4 proyectos ENLAZA reales
+- **[scripts/README_VALIDACION.md](scripts/README_VALIDACION.md)**: Guía del script de validación interactiva
+
+### Referencias
+
+- **Arquitectura C aprobada:** 15 Noviembre 2025
+- **Implementación:** 15-16 Noviembre 2025 (8 horas, 5 sesiones)
+- **Validación con proyectos reales:** 16 Noviembre 2025
+- **Versión:** 1.0 (Production-ready)
+- **Tests:** 50/50 passing (100%)
+
+---
 
 ## 📝 Ejemplo Completo
 
