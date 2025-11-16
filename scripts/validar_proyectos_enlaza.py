@@ -154,7 +154,6 @@ def capturar_proyecto() -> Optional[ProyectoSocial]:
 
     if es_pdet:
         print(f"\n✅ {municipio} es un municipio PDET")
-        print(f"   Subregión: {municipio_pdet.subregion_pdet if municipio_pdet else 'N/A'}")
         print("\n💡 Sectores prioritarios disponibles:")
 
         # Obtener sectores disponibles del municipio
