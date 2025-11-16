@@ -12,6 +12,7 @@ from models.proyecto import ProyectoSocial, AreaGeografica, EstadoProyecto
 from models.municipios_colombia import MUNICIPIOS_POR_DEPARTAMENTO, obtener_municipios, obtener_todos_departamentos
 from servicios.recomendador import RecomendadorProyectos
 from database.db_manager import get_db_manager
+from ui.componentes_pdet import SelectorSectoresPDET
 
 
 def formatear_numero(numero: float, decimales: int = 2) -> str:
@@ -93,6 +94,24 @@ def show():
             help="Selecciona los municipios específicos (opcional)",
             disabled=len(departamentos_selected) == 0,
             key="municipios_multiselect"
+        )
+
+    # NUEVO: Selector de sectores con puntajes PDET
+    sectores_seleccionados = []
+    puntajes_pdet = {}
+    es_municipio_pdet = False
+
+    if departamentos_selected and municipios_selected:
+        # Usar primer departamento y municipio para el selector
+        dept_principal = departamentos_selected[0] if isinstance(departamentos_selected, list) else departamentos_selected
+        muni_principal = municipios_selected[0] if isinstance(municipios_selected, list) else municipios_selected
+
+        # Renderizar selector de sectores con puntajes PDET
+        selector = SelectorSectoresPDET()
+        sectores_seleccionados, puntajes_pdet, es_municipio_pdet = selector.render(
+            departamento=dept_principal,
+            municipio=muni_principal,
+            key="sectores_proyecto"
         )
 
     st.markdown("---")
@@ -291,6 +310,11 @@ def show():
                 departamentos=departamentos_selected,
                 municipios=municipios_selected,
                 estado=EstadoProyecto.PROPUESTA,
+                # NUEVO: Campos PDET
+                sectores=sectores_seleccionados,
+                puntajes_pdet=puntajes_pdet,
+                tiene_municipios_pdet=es_municipio_pdet,
+                puntaje_sectorial_max=max(puntajes_pdet.values()) if puntajes_pdet else None,
                 indicadores_impacto={
                     # Información cualitativa de criterios
                     'sroi': sroi if sroi > 0 else 0.0,

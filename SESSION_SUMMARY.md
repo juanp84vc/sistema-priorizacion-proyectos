@@ -410,5 +410,230 @@ ls -la tests/
 
 ---
 
-**Última actualización:** 16 Noviembre 2025, 20:30
+## SESIÓN 4: 16 NOVIEMBRE 2025 (TARDE)
+
+### Implementación: UI Selector Sectores PDET con Puntajes en Tiempo Real
+
+**Objetivo:** Interfaz visual para selección de sectores con feedback instantáneo.
+
+### Logros
+
+#### 1. Componente SelectorSectoresPDET
+
+**Archivo:** `src/ui/componentes_pdet.py`
+
+Características:
+- ✅ Selector reactivo de sectores
+- ✅ Puntajes PDET visuales (⭐ 1-10)
+- ✅ Etiquetas de recomendación (💡 MÁXIMA PRIORIDAD, ALTA PRIORIDAD)
+- ✅ Ordenamiento automático por prioridad (mayor → menor)
+- ✅ Estimación de probabilidad en tiempo real
+- ✅ Manejo diferenciado PDET vs NO-PDET
+- ✅ Tooltips informativos
+
+**Funciones principales:**
+```python
+class SelectorSectoresPDET:
+    def render(dept, municipio, key) -> (sectores, puntajes, es_pdet)
+        # Renderiza selector con puntajes visuales
+
+def render_indicador_pdet(dept, municipio):
+    # Badge simple PDET/ZOMAC
+```
+
+#### 2. Experiencia Visual
+
+**Para municipios PDET:**
+```
+✅ ABEJORRAL (ANTIOQUIA) es municipio PDET/ZOMAC
+
+Sectores ordenados por prioridad:
+☑ Alcantarillado - 10/10 ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 💡 MÁXIMA PRIORIDAD
+☑ Infraestructura Rural - 9/10 ⭐⭐⭐⭐⭐⭐⭐⭐⭐ 💡 ALTA PRIORIDAD
+☐ Banda Ancha - 8/10 ⭐⭐⭐⭐⭐⭐⭐⭐
+☐ Educación - 6/10 ⭐⭐⭐⭐⭐⭐
+☐ Salud - 3/10 ⭐⭐⭐
+
+📊 ESTIMACIÓN PROBABILIDAD APROBACIÓN
+Score estimado: 100/100 🟢
+Probabilidad: ALTA
+
+💡 Excelente: Ha seleccionado sectores de máxima prioridad
+```
+
+**Para municipios NO-PDET:**
+```
+ℹ️  BOGOTÁ no es municipio PDET/ZOMAC
+No elegible para Obras por Impuestos
+Score: 0/100
+```
+
+#### 3. Integración en Formulario
+
+**Modificación:** `app_pages/nuevo_proyecto.py`
+
+Cambios:
+- ✅ Import de `SelectorSectoresPDET`
+- ✅ Selector renderizado FUERA del formulario (reactivo)
+- ✅ Aparece solo si hay municipios seleccionados
+- ✅ Usa primer municipio para determinar prioridades
+- ✅ Valores guardados en proyecto:
+  - `sectores: List[str]`
+  - `puntajes_pdet: Dict[str, int]`
+  - `tiene_municipios_pdet: bool`
+  - `puntaje_sectorial_max: Optional[int]`
+
+**Flujo de usuario:**
+1. Seleccionar departamento(s)
+2. Seleccionar municipio(s)
+3. **AUTOMÁTICAMENTE** aparece selector de sectores
+4. Ver puntajes en tiempo real
+5. Seleccionar sector(es)
+6. Ver estimación de probabilidad actualizada
+7. Guardar proyecto
+
+#### 4. Casos de Uso
+
+**CASO 1: Municipio PDET - Alta Prioridad**
+- Municipio: ABEJORRAL (ANTIOQUIA)
+- Sector: Alcantarillado
+- Puntaje: 10/10 ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 💡 MÁXIMA PRIORIDAD
+- Score: 100/100 🟢
+- Mensaje: "Excelente - Alta probabilidad de aprobación"
+
+**CASO 2: Municipio PDET - Prioridad Media**
+- Municipio: ABEJORRAL (ANTIOQUIA)
+- Sector: Educación
+- Puntaje: 6/10 ⭐⭐⭐⭐⭐⭐
+- Score: 60/100 🟡
+- Mensaje: "Considere sectores de mayor prioridad"
+
+**CASO 3: Municipio PDET - Baja Prioridad**
+- Municipio: ABEJORRAL (ANTIOQUIA)
+- Sector: Salud
+- Puntaje: 3/10 ⭐⭐⭐
+- Score: 30/100 🔴
+- Mensaje: ⚠️ "Baja prioridad - Revisar sectores con mayor puntaje"
+
+**CASO 4: Múltiples Sectores**
+- Sectores: Alcantarillado (10/10) + Educación (6/10)
+- Score: 100/100 (toma el máximo)
+- Lista ambos con sus puntajes
+
+**CASO 5: Municipio NO-PDET**
+- Municipio: BOGOTÁ (CUNDINAMARCA)
+- Mensaje: ℹ️ "No elegible para Obras por Impuestos"
+- Selector simple sin puntajes
+
+#### 5. Script de Demo
+
+**Archivo:** `scripts/demo_ui_sectores.py`
+
+Contenido:
+- ✅ 6 casos de prueba detallados
+- ✅ Municipios PDET de referencia
+- ✅ Validaciones a verificar (10 items)
+- ✅ Aspectos visuales (layout, colores, responsiveness)
+- ✅ Troubleshooting común
+- ✅ Instrucciones paso a paso
+
+**Ejecutar:**
+```bash
+python3 scripts/demo_ui_sectores.py
+# Muestra guía completa de pruebas
+```
+
+### Archivos Creados/Modificados
+
+**Nuevos:**
+1. `src/ui/componentes_pdet.py` (295 líneas)
+   - Clase SelectorSectoresPDET
+   - Función render_indicador_pdet
+   - Lógica de estimación y recomendaciones
+
+2. `scripts/demo_ui_sectores.py` (180 líneas)
+   - Guía completa de pruebas
+   - Casos de uso documentados
+   - Municipios de referencia
+
+**Modificados:**
+1. `app_pages/nuevo_proyecto.py`
+   - Import SelectorSectoresPDET
+   - Renderizado selector (líneas 99-116)
+   - Campos PDET en ProyectoSocial (líneas 314-317)
+
+### Características Destacadas
+
+#### 1. Feedback Visual Inmediato
+
+- 🟢 Verde: Alta probabilidad (≥80/100)
+- 🟡 Amarillo: Media probabilidad (≥60/100)
+- 🔴 Rojo: Baja probabilidad (<60/100)
+
+#### 2. Etiquetas Inteligentes
+
+- 💡 MÁXIMA PRIORIDAD: Sectores ≥9/10
+- 💡 ALTA PRIORIDAD: Sectores ≥7/10
+- ⭐ Estrellas proporcionales: 1-10 estrellas
+
+#### 3. Recomendaciones Contextuales
+
+Según puntaje máximo seleccionado:
+- ≥9: "Excelente - Alta probabilidad de aprobación"
+- 7-8: "Bien - Buena probabilidad de aprobación"
+- 5-6: ⚠️ "Advertencia - Prioridad media"
+- <5: ⚠️ "Atención - Baja prioridad"
+
+#### 4. Actualización Reactiva
+
+- Cambia municipio → Actualiza puntajes automáticamente
+- Selecciona sectores → Actualiza estimación en tiempo real
+- PDET ↔ NO-PDET → Cambia interfaz completamente
+
+### Beneficios para el Usuario
+
+1. **Transparencia:**
+   - Ve exactamente cómo se calcula la probabilidad
+   - Entiende prioridades oficiales PDET
+
+2. **Guidance:**
+   - Recomendaciones automáticas
+   - Alertas cuando selecciona sectores de baja prioridad
+
+3. **Confianza:**
+   - Datos oficiales (matriz 362 municipios)
+   - Feedback instantáneo
+
+4. **Eficiencia:**
+   - No necesita consultar documentos externos
+   - Todo integrado en un flujo
+
+### Integración con Arquitectura C
+
+Los sectores PDET alimentan el criterio **Probabilidad de Aprobación (20%)**:
+
+```python
+# Criterio Probabilidad Aprobación
+score = (puntaje_sectorial_max / 10) * 100
+contribucion = score * 0.20
+
+# Ejemplos:
+# Alcantarillado (10/10) → 100 * 0.20 = 20 puntos
+# Educación (6/10) → 60 * 0.20 = 12 puntos
+# Salud (3/10) → 30 * 0.20 = 6 puntos
+```
+
+**Impacto en score final:**
+- Score total = SROI×40% + Stakeholders×25% + **ProbAprobación×20%** + Riesgos×15%
+- Diferencia entre alta y baja prioridad: 14 puntos (20 - 6)
+
+### Próximos Pasos
+
+1. **Probar manualmente** con Streamlit (pendiente)
+2. **Actualizar vista de detalles** para mostrar sectores (opcional)
+3. **Continuar con criterio Stakeholders** (25%)
+
+---
+
+**Última actualización:** 16 Noviembre 2025, 22:00
 **Próxima sesión:** 18 Noviembre 2025 - Criterio Stakeholders (25%)
