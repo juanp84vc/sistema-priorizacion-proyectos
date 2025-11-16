@@ -1,9 +1,9 @@
 """Criterios de evaluación de proyectos"""
-from criterios.base import CriterioEvaluacion
-from criterios.costo_efectividad import CostoEfectividadCriterio
-from criterios.stakeholders import ContribucionStakeholdersCriterio
-from criterios.probabilidad_aprobacion import ProbabilidadAprobacionCriterio
-from criterios.riesgos import RiesgosCriterio
+from .base import CriterioEvaluacion
+from .costo_efectividad import CostoEfectividadCriterio
+from .stakeholders import ContribucionStakeholdersCriterio
+from .probabilidad_aprobacion import ProbabilidadAprobacionCriterio
+from .riesgos import RiesgosCriterio
 
 __all__ = [
     'CriterioEvaluacion',

@@ -5,6 +5,14 @@ DIP: Dependencia en abstracción, no implementación concreta.
 """
 from abc import ABC, abstractmethod
 from typing import Dict
+import sys
+from pathlib import Path
+
+# Agregar src al path si no está
+src_path = str(Path(__file__).parent.parent)
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
 from models.proyecto import ProyectoSocial
 
 
