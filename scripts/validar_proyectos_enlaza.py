@@ -156,16 +156,10 @@ def capturar_proyecto() -> Optional[ProyectoSocial]:
         print(f"\n✅ {municipio} es un municipio PDET")
         print("\n💡 Sectores prioritarios disponibles:")
 
-        # Obtener sectores disponibles del municipio
-        sectores_disponibles = municipio_pdet.get_sectores_priorizados() if municipio_pdet else {}
+        # Obtener sectores disponibles del municipio (ya ordenados de mayor a menor)
+        sectores_ordenados = municipio_pdet.get_sectores_ordenados() if municipio_pdet else []
 
-        if sectores_disponibles:
-            sectores_ordenados = sorted(
-                sectores_disponibles.items(),
-                key=lambda x: x[1],
-                reverse=True
-            )
-
+        if sectores_ordenados:
             for i, (sector, puntaje) in enumerate(sectores_ordenados, 1):
                 estrellas = "⭐" * min(puntaje, 5)
                 print(f"   {i}. {sector}: {puntaje}/10 {estrellas}")
