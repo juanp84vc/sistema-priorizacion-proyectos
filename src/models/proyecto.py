@@ -3,7 +3,7 @@ Modelos de dominio para proyectos sociales.
 SRP: Cada modelo tiene una responsabilidad clara.
 """
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from enum import Enum
 
 
@@ -63,6 +63,17 @@ class ProyectoSocial:
     # NUEVO: Puntaje máximo sectorial (calculado)
     puntaje_sectorial_max: Optional[int] = None
 
+    # NUEVO: Observaciones SROI (metodología, supuestos, fuentes) - Arquitectura C
+    observaciones_sroi: str = ""
+    # Max 1000 caracteres
+    # Formato: Markdown simple permitido
+    # Propósito: Documentar cálculo SROI, supuestos, limitaciones
+
+    # NUEVO: Metadata SROI - Arquitectura C
+    nivel_confianza_sroi: Optional[str] = None  # "Alta", "Media", "Baja"
+    fecha_calculo_sroi: Optional[str] = None
+    metodologia_sroi: Optional[str] = None  # "Estándar", "Simplificada", "Preliminar"
+
     # Metadata
     fecha_presentacion: str = ""
     contacto_organizacion: str = ""
@@ -90,3 +101,66 @@ class ProyectoSocial:
     def duracion_años(self) -> float:
         """Duración en años"""
         return self.duracion_meses / 12
+
+    def validar_sroi(self) -> Dict[str, Any]:
+        """
+        Valida el valor SROI del proyecto según Arquitectura C.
+
+        Rangos aprobados (15 Nov 2025):
+        - < 1.0: RECHAZAR (destruye valor social)
+        - 1.0-1.99: BAJA (retorno marginal)
+        - 2.0-2.99: MEDIA (retorno aceptable)
+        - ≥ 3.0: ALTA (retorno excelente)
+        - > 7.0: VERIFICAR (requiere validación metodológica)
+
+        Returns:
+            Dict con:
+            - 'valido': bool
+            - 'mensaje': str
+            - 'nivel': str (RECHAZAR, BAJA, MEDIA, ALTA, VERIFICAR)
+            - 'requiere_observaciones': bool
+        """
+        sroi = self.indicadores_impacto.get('sroi', 0)
+
+        if sroi < 1.0:
+            return {
+                'valido': False,
+                'mensaje': 'RECHAZADO - SROI < 1.0 destruye valor social',
+                'nivel': 'RECHAZAR',
+                'requiere_observaciones': True
+            }
+        elif sroi > 7.0:
+            return {
+                'valido': True,
+                'mensaje': 'ALERTA - SROI > 7.0 requiere verificación metodológica',
+                'nivel': 'VERIFICAR',
+                'requiere_observaciones': True
+            }
+        elif sroi > 5.0:
+            return {
+                'valido': True,
+                'mensaje': 'SROI alto - Documentar metodología',
+                'nivel': 'ALTA',
+                'requiere_observaciones': True
+            }
+        elif sroi >= 3.0:
+            return {
+                'valido': True,
+                'mensaje': 'SROI excelente',
+                'nivel': 'ALTA',
+                'requiere_observaciones': False
+            }
+        elif sroi >= 2.0:
+            return {
+                'valido': True,
+                'mensaje': 'SROI aceptable',
+                'nivel': 'MEDIA',
+                'requiere_observaciones': False
+            }
+        else:  # 1.0 <= sroi < 2.0
+            return {
+                'valido': True,
+                'mensaje': 'SROI marginal',
+                'nivel': 'BAJA',
+                'requiere_observaciones': False
+            }
