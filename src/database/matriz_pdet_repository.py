@@ -5,7 +5,8 @@ Proporciona interfaz para consultar datos oficiales de Obras por Impuestos
 sobre priorización sectorial en 362 municipios PDET/ZOMAC.
 """
 import sqlite3
-from typing import Optional, List, Tuple
+import unicodedata
+from typing import Optional, List, Tuple, Dict
 from pathlib import Path
 import sys
 
@@ -32,6 +33,40 @@ class MatrizPDETRepository:
         """
         self.db_path = db_path
         self._inicializar_tabla()
+
+    @staticmethod
+    def normalizar_texto(texto: str) -> str:
+        """
+        Normaliza texto para comparación:
+        - Convierte a mayúsculas
+        - Elimina acentos/tildes
+        - Elimina espacios extra
+
+        Ejemplos:
+        'Agustín Codazzi' → 'AGUSTIN CODAZZI'
+        'BOGOTÁ D.C.' → 'BOGOTA D.C.'
+        """
+        if not texto:
+            return ""
+
+        # Convertir a mayúsculas
+        texto = texto.upper()
+
+        # Eliminar acentos/tildes
+        # NFD = Canonical Decomposition
+        # Separa caracteres base de diacríticos (é → e + ´)
+        texto_nfd = unicodedata.normalize('NFD', texto)
+
+        # Mantener solo caracteres base (no diacríticos)
+        texto_sin_acentos = ''.join(
+            char for char in texto_nfd
+            if unicodedata.category(char) != 'Mn'  # Mn = Nonspacing Mark (diacríticos)
+        )
+
+        # Normalizar espacios
+        texto_normalizado = ' '.join(texto_sin_acentos.split())
+
+        return texto_normalizado
 
     def _inicializar_tabla(self):
         """Crea tabla matriz_pdet_zomac si no existe"""
@@ -165,18 +200,114 @@ class MatrizPDETRepository:
                 for row in cursor.fetchall()
             ]
 
-    def es_municipio_pdet(self, departamento: str, municipio: str) -> bool:
+    def es_municipio_pdet(self, municipio: str, departamento: str) -> bool:
         """
-        Verifica si municipio está en lista PDET/ZOMAC.
+        Verifica si un municipio es PDET.
+
+        Búsqueda normalizada (case-insensitive, sin acentos)
 
         Args:
-            departamento: Nombre del departamento
             municipio: Nombre del municipio
+            departamento: Nombre del departamento
 
         Returns:
-            True si está en PDET/ZOMAC, False si no
+            True si es municipio PDET, False en caso contrario
         """
-        return self.get_municipio(departamento, municipio) is not None
+        # Normalizar entradas
+        municipio_norm = self.normalizar_texto(municipio)
+        departamento_norm = self.normalizar_texto(departamento)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Query con normalización en BD (todos los diacríticos)
+        query = """
+        SELECT COUNT(*)
+        FROM matriz_pdet_zomac
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                  UPPER(municipio),
+                  'Á', 'A'), 'É', 'E'), 'Í', 'I'), 'Ó', 'O'), 'Ú', 'U'), 'Ñ', 'N'), 'Ü', 'U'),
+                'á', 'a'), 'é', 'e'), 'í', 'i'), 'ó', 'o'), 'ú', 'u'), 'ñ', 'n'), 'ü', 'u'
+        ) = ?
+        AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                  UPPER(departamento),
+                  'Á', 'A'), 'É', 'E'), 'Í', 'I'), 'Ó', 'O'), 'Ú', 'U'), 'Ñ', 'N'), 'Ü', 'U'),
+                'á', 'a'), 'é', 'e'), 'í', 'i'), 'ó', 'o'), 'ú', 'u'), 'ñ', 'n'), 'ü', 'u'
+        ) = ?
+        """
+
+        cursor.execute(query, (municipio_norm, departamento_norm))
+        count = cursor.fetchone()[0]
+        conn.close()
+
+        return count > 0
+
+    def get_puntajes_sectores(self, municipio: str, departamento: str) -> Dict[str, int]:
+        """
+        Obtiene los puntajes sectoriales para un municipio PDET.
+
+        Búsqueda normalizada (case-insensitive, sin acentos)
+
+        Args:
+            municipio: Nombre del municipio
+            departamento: Nombre del departamento
+
+        Returns:
+            Diccionario {sector: puntaje} con los 10 sectores
+        """
+        # Normalizar entradas
+        municipio_norm = self.normalizar_texto(municipio)
+        departamento_norm = self.normalizar_texto(departamento)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Query con normalización (todos los diacríticos)
+        query = """
+        SELECT
+            educacion, salud, alcantarillado, via, energia,
+            banda_ancha, riesgo_ambiental, infraestructura_rural,
+            cultura, deporte
+        FROM matriz_pdet_zomac
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                  UPPER(municipio),
+                  'Á', 'A'), 'É', 'E'), 'Í', 'I'), 'Ó', 'O'), 'Ú', 'U'), 'Ñ', 'N'), 'Ü', 'U'),
+                'á', 'a'), 'é', 'e'), 'í', 'i'), 'ó', 'o'), 'ú', 'u'), 'ñ', 'n'), 'ü', 'u'
+        ) = ?
+        AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                  UPPER(departamento),
+                  'Á', 'A'), 'É', 'E'), 'Í', 'I'), 'Ó', 'O'), 'Ú', 'U'), 'Ñ', 'N'), 'Ü', 'U'),
+                'á', 'a'), 'é', 'e'), 'í', 'i'), 'ó', 'o'), 'ú', 'u'), 'ñ', 'n'), 'ü', 'u'
+        ) = ?
+        LIMIT 1
+        """
+
+        cursor.execute(query, (municipio_norm, departamento_norm))
+        resultado = cursor.fetchone()
+        conn.close()
+
+        if not resultado:
+            return {}
+
+        # Mapear a nombres de sectores
+        sectores = {
+            'Educación': resultado[0],
+            'Salud': resultado[1],
+            'Alcantarillado': resultado[2],
+            'Infraestructura Vial': resultado[3],
+            'Energía': resultado[4],
+            'Banda Ancha': resultado[5],
+            'Riesgo Ambiental': resultado[6],
+            'Infraestructura Rural': resultado[7],
+            'Cultura': resultado[8],
+            'Deporte': resultado[9]
+        }
+
+        return sectores
 
     def get_departamentos(self) -> List[str]:
         """
@@ -195,7 +326,9 @@ class MatrizPDETRepository:
 
     def get_municipios_por_departamento(self, departamento: str) -> List[str]:
         """
-        Lista municipios PDET/ZOMAC de un departamento.
+        Obtiene lista de municipios PDET de un departamento.
+
+        Búsqueda normalizada (case-insensitive, sin acentos)
 
         Args:
             departamento: Nombre del departamento
@@ -203,14 +336,30 @@ class MatrizPDETRepository:
         Returns:
             Lista de nombres de municipios ordenados alfabéticamente
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("""
-                SELECT municipio
-                FROM matriz_pdet_zomac
-                WHERE UPPER(departamento) = UPPER(?)
-                ORDER BY municipio
-            """, (departamento,))
-            return [row[0] for row in cursor.fetchall()]
+        # Normalizar entrada
+        departamento_norm = self.normalizar_texto(departamento)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Query con normalización (todos los diacríticos)
+        query = """
+        SELECT DISTINCT municipio
+        FROM matriz_pdet_zomac
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                  UPPER(departamento),
+                  'Á', 'A'), 'É', 'E'), 'Í', 'I'), 'Ó', 'O'), 'Ú', 'U'), 'Ñ', 'N'), 'Ü', 'U'),
+                'á', 'a'), 'é', 'e'), 'í', 'i'), 'ó', 'o'), 'ú', 'u'), 'ñ', 'n'), 'ü', 'u'
+        ) = ?
+        ORDER BY municipio
+        """
+
+        cursor.execute(query, (departamento_norm,))
+        municipios = [row[0] for row in cursor.fetchall()]
+        conn.close()
+
+        return municipios
 
     def get_total_municipios(self) -> int:
         """
