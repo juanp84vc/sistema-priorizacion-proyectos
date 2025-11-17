@@ -1,5 +1,7 @@
 # Sistema de Priorización de Proyectos Sociales
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/juanp84vc/sistema-priorizacion-proyectos/blob/main/Sistema_Priorizacion_Colab.ipynb)
+
 Sistema modular y extensible para evaluar y priorizar proyectos de inversión social siguiendo **estrictamente los principios SOLID**.
 
 ## 🎯 Características
@@ -23,6 +25,22 @@ Sistema modular y extensible para evaluar y priorizar proyectos de inversión so
 - ✅ 100% Python type-safe
 
 ## 📦 Instalación
+
+### Opción 1: Google Colab (Recomendado para pruebas rápidas)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/juanp84vc/sistema-priorizacion-proyectos/blob/main/Sistema_Priorizacion_Colab.ipynb)
+
+Haz clic en el badge de arriba para abrir el notebook en Google Colab. El notebook incluye:
+- Clonación automática del repositorio
+- Instalación de dependencias
+- Visualización del README completo
+- Ejemplos ejecutables paso a paso
+- Consulta de datos PDET/ZOMAC
+- Ejecución de tests
+
+**No requiere instalación local** - todo corre en la nube de Google.
+
+### Opción 2: Instalación Local
 
 ```bash
 cd /Users/juanpablotovar/Desktop/claude_code/sistema-priorizacion-proyectos
