@@ -12,8 +12,8 @@ if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
 from criterios import (
-    CostoEfectividadCriterio,
-    ContribucionStakeholdersCriterio,
+    SROICriterio,
+    StakeholdersCriterio,
     ProbabilidadAprobacionCriterio,
     RiesgosCriterio
 )
@@ -89,11 +89,11 @@ def show():
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        peso_costo = st.slider(
-            "Costo-Efectividad",
+        peso_sroi = st.slider(
+            "SROI (Impacto Social)",
             min_value=0.0,
             max_value=1.0,
-            value=st.session_state.configuracion['criterios']['costo_efectividad'],
+            value=0.40,  # Arquitectura C default
             step=0.05
         )
 
@@ -125,7 +125,7 @@ def show():
         )
 
     # Validar suma de pesos
-    suma_pesos = peso_costo + peso_stakeholders + peso_probabilidad + peso_riesgos
+    suma_pesos = peso_sroi + peso_stakeholders + peso_probabilidad + peso_riesgos
 
     if abs(suma_pesos - 1.0) > 0.01:
         st.error(f"❌ La suma de pesos debe ser 1.0. Actual: {suma_pesos:.2f}")
@@ -140,8 +140,8 @@ def show():
             col1, col2, col3, col4 = st.columns(4)
 
             with col1:
-                umbral_costo = st.number_input(
-                    "Costo-Efectividad",
+                umbral_sroi = st.number_input(
+                    "SROI (Impacto Social)",
                     min_value=0.0,
                     max_value=100.0,
                     value=40.0,
@@ -176,7 +176,7 @@ def show():
                 )
 
             umbrales = {
-                "Relación Costo-Efectividad": umbral_costo,
+                "SROI (Retorno Social de Inversión)": umbral_sroi,
                 "Contribución al Relacionamiento con Stakeholders": umbral_stakeholders,
                 "Probabilidad de Aprobación Gubernamental": umbral_probabilidad,
                 "Evaluación de Riesgos": umbral_riesgos
@@ -190,10 +190,10 @@ def show():
             st.warning("Selecciona al menos un proyecto")
             return
 
-        # Crear criterios
+        # Crear criterios (Arquitectura C)
         criterios = [
-            CostoEfectividadCriterio(peso=peso_costo),
-            ContribucionStakeholdersCriterio(peso=peso_stakeholders),
+            SROICriterio(peso=peso_sroi),
+            StakeholdersCriterio(peso=peso_stakeholders),
             ProbabilidadAprobacionCriterio(peso=peso_probabilidad),
             RiesgosCriterio(peso=peso_riesgos)
         ]
