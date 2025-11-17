@@ -4,6 +4,7 @@ Incluye matriz PDET de 362 municipios y cálculo automático de score.
 """
 import streamlit as st
 import sys
+import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -698,8 +699,13 @@ def seccion_revision_calculo(datos_basicos: Dict, criterios: Dict):
 
     if calcular:
         with st.spinner("Calculando score..."):
-            # Crear ProyectoSocial
+            # Crear ProyectoSocial con TODOS los campos requeridos
             proyecto = ProyectoSocial(
+                # Campos requeridos
+                id=str(uuid.uuid4()),
+                ods_vinculados=[],  # TODO: Agregar selector de ODS en futuras versiones
+
+                # Datos básicos
                 nombre=datos_basicos['nombre'],
                 organizacion=datos_basicos['organizacion'],
                 descripcion=datos_basicos['descripcion'],
