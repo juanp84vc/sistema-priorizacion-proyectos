@@ -1,497 +1,866 @@
-"""Página para crear nuevos proyectos."""
+"""
+Página para crear nuevos proyectos con Arquitectura C completa.
+Incluye matriz PDET de 362 municipios y cálculo automático de score.
+"""
 import streamlit as st
 import sys
 from pathlib import Path
+from typing import Dict, List, Optional
+from datetime import datetime
 
-# Agregar src al path si no está
+# Agregar src al path
 src_path = str(Path(__file__).parent.parent / "src")
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
-from models.proyecto import ProyectoSocial, AreaGeografica, EstadoProyecto
-from models.municipios_colombia import MUNICIPIOS_POR_DEPARTAMENTO, obtener_municipios, obtener_todos_departamentos
-from servicios.recomendador import RecomendadorProyectos
+# Imports del modelo
+from models.proyecto import ProyectoSocial, AreaGeografica
+
+# Motor de scoring Arquitectura C
+from scoring.motor_arquitectura_c import calcular_score_proyecto
+
+# Repositorio PDET
+from database.matriz_pdet_repository import MatrizPDETRepository
+
+# Database manager
 from database.db_manager import get_db_manager
-from ui.componentes_pdet import SelectorSectoresPDET
+
+
+# ============================================================================
+# INICIALIZACION
+# ============================================================================
+
+@st.cache_resource
+def get_pdet_repository():
+    """Obtiene instancia del repositorio PDET (cached)"""
+    return MatrizPDETRepository()
+
+
+@st.cache_resource
+def get_db():
+    """Obtiene instancia del database manager (cached)"""
+    return get_db_manager()
+
+
+# ============================================================================
+# FUNCIONES AUXILIARES
+# ============================================================================
+
+def limpiar_session_state():
+    """Limpia los datos del formulario del session state"""
+    keys_to_delete = [
+        'datos_basicos',
+        'criterios',
+        'ultimo_resultado',
+        'ultimo_proyecto'
+    ]
+    for key in keys_to_delete:
+        if key in st.session_state:
+            del st.session_state[key]
 
 
 def formatear_numero(numero: float, decimales: int = 2) -> str:
-    """
-    Formatea un número con punto para miles y coma para decimales.
-
-    Args:
-        numero: Número a formatear
-        decimales: Cantidad de decimales a mostrar
-
-    Returns:
-        str: Número formateado (ej: 1.234.567,89)
-    """
+    """Formatea número con separadores de miles"""
     if numero is None:
-        return "0,00"
-
-    # Formatear con decimales
-    formato = f"{{:,.{decimales}f}}"
-    numero_formateado = formato.format(numero)
-
-    # Intercambiar punto y coma (de formato US a formato europeo/latinoamericano)
-    numero_formateado = numero_formateado.replace(",", "TEMP")
-    numero_formateado = numero_formateado.replace(".", ",")
-    numero_formateado = numero_formateado.replace("TEMP", ".")
-
-    return numero_formateado
+        return "0"
+    return f"{numero:,.{decimales}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def show():
-    """Muestra el formulario de nuevo proyecto."""
-    st.markdown("<h1 class='main-header'>➕ Nuevo Proyecto</h1>", unsafe_allow_html=True)
-    st.markdown("---")
+# ============================================================================
+# SECCION 1: DATOS BASICOS
+# ============================================================================
 
-    # Inicializar estado para controlar el reinicio del formulario
-    if 'proyecto_guardado' not in st.session_state:
-        st.session_state.proyecto_guardado = False
+def seccion_datos_basicos() -> Optional[Dict]:
+    """Sección de datos básicos del proyecto"""
 
-    # Botón para limpiar formulario
-    col_title, col_clear = st.columns([3, 1])
-    with col_title:
-        st.markdown("### Información del Proyecto")
-    with col_clear:
-        if st.button("🔄 Limpiar Formulario", use_container_width=True):
-            # Limpiar los selectores de ubicación
-            if 'departamentos_multiselect' in st.session_state:
-                del st.session_state.departamentos_multiselect
-            if 'municipios_multiselect' in st.session_state:
-                del st.session_state.municipios_multiselect
-            st.session_state.proyecto_guardado = False
-            st.rerun()
+    repo_pdet = get_pdet_repository()
 
-    # Selectores de ubicación FUERA del formulario para permitir actualización dinámica
-    st.markdown("#### 🌍 Selección de Ubicación")
-    st.caption("Selecciona primero los departamentos, luego podrás elegir los municipios específicos")
+    st.subheader("📋 Información General")
 
-    col_dept, col_muni = st.columns(2)
+    st.markdown("""
+    Complete los datos básicos del proyecto. Los campos marcados con * son obligatorios.
+    """)
 
-    with col_dept:
-        departamentos_selected = st.multiselect(
-            "Departamentos donde se ejecutará *",
-            options=obtener_todos_departamentos(),
-            help="Selecciona uno o más departamentos",
-            key="departamentos_multiselect"
-        )
-
-    with col_muni:
-        # Selector dinámico de municipios basado en departamentos seleccionados
-        municipios_disponibles = []
-        if departamentos_selected:
-            for dept in departamentos_selected:
-                munis = obtener_municipios(dept)
-                municipios_disponibles.extend(munis)
-            # Eliminar duplicados y ordenar
-            municipios_disponibles = sorted(list(set(municipios_disponibles)))
-
-        municipios_selected = st.multiselect(
-            "Municipios donde se ejecutará",
-            options=municipios_disponibles,
-            help="Selecciona los municipios específicos (opcional)",
-            disabled=len(departamentos_selected) == 0,
-            key="municipios_multiselect"
-        )
-
-    # NUEVO: Selector de sectores con puntajes PDET
-    sectores_seleccionados = []
-    puntajes_pdet = {}
-    es_municipio_pdet = False
-
-    if departamentos_selected and municipios_selected:
-        # Usar primer departamento y municipio para el selector
-        dept_principal = departamentos_selected[0] if isinstance(departamentos_selected, list) else departamentos_selected
-        muni_principal = municipios_selected[0] if isinstance(municipios_selected, list) else municipios_selected
-
-        # Renderizar selector de sectores con puntajes PDET
-        selector = SelectorSectoresPDET()
-        sectores_seleccionados, puntajes_pdet, es_municipio_pdet = selector.render(
-            departamento=dept_principal,
-            municipio=muni_principal,
-            key="sectores_proyecto"
-        )
-
-    st.markdown("---")
-
-    # Formulario
-    with st.form("nuevo_proyecto_form"):
-        # Sección 1: Información Básica
-        st.markdown("#### 📋 Información Básica")
-
+    with st.form("form_datos_basicos"):
         col1, col2 = st.columns(2)
 
         with col1:
             nombre = st.text_input(
                 "Nombre del Proyecto *",
-                placeholder="Ej: Educación Digital Rural"
+                placeholder="Ej: Acueducto Rural Abejorral",
+                help="Nombre descriptivo del proyecto"
             )
+
             organizacion = st.text_input(
                 "Organización Ejecutora *",
-                placeholder="Ej: Fundación TechRural"
+                value="ENLAZA GEB",
+                help="Entidad responsable de ejecutar el proyecto"
             )
 
-        with col2:
-            proyecto_id = st.text_input(
-                "ID del Proyecto *",
-                placeholder="Ej: PROY-001"
-            )
-            poblacion = st.text_input(
-                "Población Objetivo *",
-                placeholder="Ej: Niños y jóvenes en zonas rurales"
-            )
-
-        descripcion = st.text_area(
-            "Descripción del Proyecto *",
-            placeholder="Describe brevemente el proyecto, sus objetivos y metodología...",
-            height=100
-        )
-
-        # Sección 2: Información Geográfica y Temporal
-        st.markdown("#### 🌍 Alcance Geográfico y Temporal")
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            area_geografica = st.selectbox(
-                "Área Geográfica *",
-                options=["urbana", "rural", "periurbana", "nacional"]
-            )
-
-        with col2:
-            duracion_meses = st.number_input(
-                "Duración (meses) *",
-                min_value=1,
-                max_value=120,
-                value=24,
-                step=1
-            )
-
-        with col3:
             presupuesto = st.number_input(
-                "Presupuesto Total ($) *",
-                min_value=0.0,
-                value=100000.0,
-                step=1000.0,
-                format="%.2f"
+                "Presupuesto Total (COP) *",
+                min_value=0,
+                value=500_000_000,
+                step=10_000_000,
+                format="%d",
+                help="Presupuesto total en pesos colombianos"
             )
 
-        # Sección 3: Beneficiarios
-        st.markdown("#### 👥 Beneficiarios")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
+        with col2:
             beneficiarios_directos = st.number_input(
                 "Beneficiarios Directos *",
                 min_value=0,
-                value=500,
-                step=10
+                value=1000,
+                step=100,
+                help="Número de personas directamente beneficiadas"
             )
 
-        with col2:
             beneficiarios_indirectos = st.number_input(
-                "Beneficiarios Indirectos *",
+                "Beneficiarios Indirectos",
                 min_value=0,
-                value=1500,
-                step=10
+                value=4000,
+                step=100,
+                help="Número de personas indirectamente beneficiadas"
             )
 
-        # Sección 4: Información Cualitativa de Criterios
-        st.markdown("#### 📋 Información Adicional de Evaluación")
-        st.caption("Información cualitativa que complementa la evaluación automática")
+            duracion = st.number_input(
+                "Duración Estimada (meses) *",
+                min_value=1,
+                max_value=60,
+                value=12,
+                help="Tiempo estimado de ejecución"
+            )
 
-        # Criterio 1: Costo-Efectividad
-        st.markdown("**Criterio 1: Costo-Efectividad**")
+        descripcion = st.text_area(
+            "Descripción del Proyecto",
+            placeholder="Describa brevemente el proyecto, sus objetivos y alcance...",
+            height=100
+        )
+
+        st.markdown("---")
+        st.markdown("### 📍 Ubicación Geográfica")
+
+        # Obtener departamentos disponibles
+        departamentos_disponibles = repo_pdet.get_departamentos()
+
         col1, col2 = st.columns(2)
 
         with col1:
-            sroi = st.number_input(
-                "SROI (Retorno Social de la Inversión)",
-                min_value=0.0,
-                max_value=100.0,
-                value=0.0,
-                step=0.1,
-                help="Ratio que mide el retorno social de la inversión (ej: 3.5 significa que por cada peso invertido se generan 3.5 pesos de valor social)"
+            departamento = st.selectbox(
+                "Departamento *",
+                options=["Seleccionar..."] + sorted(departamentos_disponibles),
+                help="Departamento donde se ejecutará el proyecto"
             )
 
         with col2:
-            pertinencia_operacional = st.selectbox(
-                "Pertinencia Operacional y Reputacional",
-                options=["Alta", "Media", "Baja"],
-                index=1,
-                help="Evalúa la pertinencia del proyecto para las operaciones y reputación de GEB"
-            )
+            if departamento and departamento != "Seleccionar...":
+                # Obtener municipios del departamento
+                municipios_dpto = repo_pdet.get_municipios_por_departamento(departamento)
 
-        st.markdown("---")
-
-        # Criterio 2: Relacionamiento con Stakeholders
-        st.markdown("**Criterio 2: Relacionamiento con Stakeholders**")
-        contribucion_stakeholders = st.selectbox(
-            "Nivel de Contribución al Relacionamiento",
-            options=["Alta", "Moderada", "Baja"],
-            index=1,
-            help="Evalúa el nivel de contribución al relacionamiento con stakeholders locales"
-        )
-
-        st.markdown("---")
-
-        # Criterio 3: Probabilidad de Aprobación
-        st.markdown("**Criterio 3: Probabilidad de Aprobación**")
-        sectores_zomac = st.selectbox(
-            "Alineación con Sectores Prioritarios",
-            options=[
-                "Top 2 sectores prioritarios ZOMAC/PDET",
-                "Top 3 sectores ZOMAC/PDET",
-                "Top 4 sectores ZOMAC/PDET",
-                "Requiere esfuerzos de alineación",
-                "No ZOMAC/PDET o no se alinea"
-            ],
-            index=2,
-            help="Indica el nivel de alineación del proyecto con sectores prioritarios ZOMAC/PDET"
-        )
-
-        st.markdown("---")
-
-        # Criterio 4: Riesgos de Ejecución
-        st.markdown("**Criterio 4: Riesgos de Ejecución**")
-        nivel_riesgos = st.selectbox(
-            "Nivel de Riesgos",
-            options=["Bajos y manejables", "Medios y manejables", "Altos pero mitigables", "Altos y complejos"],
-            index=1,
-            help="Evaluación cualitativa de los riesgos asociados a la ejecución del proyecto"
-        )
-
-        # Botones
-        st.markdown("---")
-        col1, col2, col3 = st.columns([1, 1, 2])
-
-        with col1:
-            submit = st.form_submit_button("✅ Guardar Proyecto", type="primary", use_container_width=True)
-
-        with col2:
-            cancel = st.form_submit_button("❌ Cancelar", use_container_width=True)
-
-    # Procesar formulario
-    if submit:
-        # Validaciones
-        if not nombre or not organizacion or not proyecto_id or not poblacion or not descripcion:
-            st.error("❌ Por favor completa todos los campos obligatorios (*)")
-            return
-
-        if len(departamentos_selected) == 0:
-            st.error("❌ Debes seleccionar al menos un departamento")
-            return
-
-        # Obtener gestor de base de datos
-        db = get_db_manager()
-
-        # Verificar que no exista un proyecto con el mismo ID
-        if db.obtener_proyecto(proyecto_id) is not None:
-            st.error(f"❌ Ya existe un proyecto con el ID '{proyecto_id}'. Por favor usa un ID diferente.")
-            return
-
-        # Crear proyecto
-        try:
-            proyecto = ProyectoSocial(
-                id=proyecto_id,
-                nombre=nombre,
-                organizacion=organizacion,
-                descripcion=descripcion,
-                beneficiarios_directos=beneficiarios_directos,
-                beneficiarios_indirectos=beneficiarios_indirectos,
-                duracion_meses=duracion_meses,
-                presupuesto_total=presupuesto,
-                ods_vinculados=[],  # Campo mantenido para compatibilidad pero vacío
-                area_geografica=AreaGeografica(area_geografica),
-                poblacion_objetivo=poblacion,
-                departamentos=departamentos_selected,
-                municipios=municipios_selected,
-                estado=EstadoProyecto.PROPUESTA,
-                # NUEVO: Campos PDET
-                sectores=sectores_seleccionados,
-                puntajes_pdet=puntajes_pdet,
-                tiene_municipios_pdet=es_municipio_pdet,
-                puntaje_sectorial_max=max(puntajes_pdet.values()) if puntajes_pdet else None,
-                indicadores_impacto={
-                    # Información cualitativa de criterios
-                    'sroi': sroi if sroi > 0 else 0.0,
-                    'pertinencia_operacional': pertinencia_operacional,
-                    'contribucion_stakeholders': contribucion_stakeholders,
-                    'sectores_zomac': sectores_zomac,
-                    'nivel_riesgos': nivel_riesgos,
-                    # Valores por defecto para compatibilidad
-                    'años_experiencia': 5,
-                    'equipo_calificado': 0.8,
-                    'proyectos_exitosos': 3,
-                    'fuentes_financiamiento': 3,
-                    'ingresos_propios_pct': 20.0
-                }
-            )
-
-            # Guardar en base de datos
-            if db.crear_proyecto(proyecto):
-                # Actualizar session state con la lista completa desde BD
-                st.session_state.proyectos = db.obtener_todos_proyectos()
-                st.session_state.proyecto_guardado = True
-                st.success(f"✅ Proyecto '{nombre}' creado exitosamente! Total de proyectos: {len(st.session_state.proyectos)}")
+                municipio = st.selectbox(
+                    "Municipio *",
+                    options=["Seleccionar..."] + sorted(municipios_dpto),
+                    help="Municipio donde se ejecutará el proyecto"
+                )
             else:
-                st.error(f"❌ Error al guardar el proyecto en la base de datos.")
-                return
+                municipio = st.selectbox(
+                    "Municipio *",
+                    options=["Primero seleccione departamento"],
+                    disabled=True
+                )
+                municipio = None
 
-            # Generar recomendaciones personalizadas
-            recomendador = RecomendadorProyectos()
-            recomendaciones = recomendador.analizar_proyecto(proyecto)
-            # Para proyecto nuevo, usar score estimado base de 50
-            score_estimado, mensaje_score = recomendador.generar_score_potencial(
-                proyecto=proyecto,
-                score_actual=50.0  # Score base para proyecto nuevo sin evaluar
+        # Detectar automáticamente si es PDET
+        es_pdet = False
+        puntajes_sectores = {}
+
+        if municipio and municipio != "Seleccionar...":
+            es_pdet = repo_pdet.es_municipio_pdet(municipio, departamento)
+
+            if es_pdet:
+                st.success(f"✅ **{municipio}** es municipio PDET - Elegible para Obras por Impuestos")
+                puntajes_sectores = repo_pdet.get_puntajes_sectores(municipio, departamento)
+
+                # Mostrar puntajes disponibles
+                if puntajes_sectores:
+                    st.caption(f"📊 Sectores disponibles: {', '.join(puntajes_sectores.keys())}")
+            else:
+                st.warning(f"⚠️ **{municipio}** NO es municipio PDET")
+                st.caption("Score Probabilidad de Aprobación = 0")
+
+        submitted = st.form_submit_button(
+            "✅ Continuar a Criterios de Evaluación",
+            type="primary",
+            use_container_width=True
+        )
+
+        if submitted:
+            # Validaciones
+            errores = []
+
+            if not nombre:
+                errores.append("El nombre del proyecto es requerido")
+            if not organizacion:
+                errores.append("La organización es requerida")
+            if presupuesto <= 0:
+                errores.append("El presupuesto debe ser mayor a 0")
+            if beneficiarios_directos <= 0:
+                errores.append("Los beneficiarios directos deben ser mayor a 0")
+            if not departamento or departamento == "Seleccionar...":
+                errores.append("Debe seleccionar un departamento")
+            if not municipio or municipio == "Seleccionar...":
+                errores.append("Debe seleccionar un municipio")
+
+            if errores:
+                for error in errores:
+                    st.error(f"❌ {error}")
+                return None
+
+            # Guardar en session_state
+            st.session_state.datos_basicos = {
+                'nombre': nombre,
+                'organizacion': organizacion,
+                'descripcion': descripcion,
+                'presupuesto': presupuesto,
+                'beneficiarios_directos': beneficiarios_directos,
+                'beneficiarios_indirectos': beneficiarios_indirectos,
+                'duracion': duracion,
+                'departamento': departamento,
+                'municipio': municipio,
+                'es_pdet': es_pdet,
+                'puntajes_sectores': puntajes_sectores
+            }
+
+            st.success("✅ Datos básicos guardados. Continúe a la pestaña 'Criterios de Evaluación'")
+            st.rerun()
+
+    # Retornar datos si ya están guardados
+    return st.session_state.get('datos_basicos', None)
+
+
+# ============================================================================
+# SECCION 2: CRITERIOS DE EVALUACION
+# ============================================================================
+
+def seccion_criterios_evaluacion(datos_basicos: Dict) -> Optional[Dict]:
+    """Sección de criterios de evaluación - 4 criterios de Arquitectura C"""
+
+    st.markdown(f"""
+    ### Proyecto: {datos_basicos['nombre']}
+    **Municipio:** {datos_basicos['municipio']}, {datos_basicos['departamento']}
+    **PDET:** {'✅ Sí' if datos_basicos['es_pdet'] else '❌ No'}
+    """)
+
+    st.markdown("---")
+
+    # ========== CRITERIO 1: SROI (40%) ==========
+    st.markdown("## 📊 Criterio 1: SROI - Social Return on Investment (40%)")
+
+    st.markdown("""
+    **SROI mide cuánto valor social se genera por cada peso invertido.**
+
+    - SROI < 1.0: Destruye valor social ❌
+    - SROI 1.0-2.0: Retorno bajo
+    - SROI 2.0-3.0: Retorno medio
+    - SROI ≥ 3.0: Retorno alto ✅
+    """)
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        sroi = st.number_input(
+            "SROI Estimado *",
+            min_value=0.0,
+            max_value=20.0,
+            value=3.0,
+            step=0.1,
+            help="Valor social generado / Inversión realizada"
+        )
+
+    with col2:
+        if sroi < 1.0:
+            st.error("⚠️ SROI < 1.0\nDestruye valor")
+        elif sroi < 2.0:
+            st.warning("📊 Retorno Bajo")
+        elif sroi < 3.0:
+            st.info("📈 Retorno Medio")
+        else:
+            st.success("⭐ Retorno Alto")
+
+    if sroi > 7.0:
+        st.warning("⚠️ SROI muy alto (>7.0). Verifique metodología de cálculo.")
+
+    st.markdown("---")
+
+    # ========== CRITERIO 2: PROBABILIDAD APROBACION (20%) ==========
+    st.markdown("## 🎯 Criterio 2: Probabilidad de Aprobación (20%)")
+
+    sector_seleccionado = None
+    puntaje_sector = 0
+
+    if datos_basicos['es_pdet']:
+        st.success("✅ Municipio PDET - Elegible para Obras por Impuestos")
+
+        st.markdown("**Seleccione el sector del proyecto:**")
+        st.caption("Los puntajes muestran la prioridad sectorial oficial del municipio (1-10)")
+
+        sectores_disponibles = datos_basicos['puntajes_sectores']
+
+        if sectores_disponibles:
+            # Ordenar por puntaje descendente
+            sectores_ordenados = sorted(
+                sectores_disponibles.items(),
+                key=lambda x: x[1],
+                reverse=True
             )
 
-            # Mostrar score estimado
-            st.info(f"📊 {mensaje_score}")
+            sector_seleccionado = st.radio(
+                "Sector *",
+                options=[s[0] for s in sectores_ordenados],
+                format_func=lambda x: f"{x.title()} (⭐ {sectores_disponibles[x]}/10)",
+                help="Sector con mayor puntaje tiene mayor probabilidad de aprobación"
+            )
 
-            # Mostrar recomendaciones en pestañas
-            if any(recomendaciones.values()):
-                st.markdown("### 💡 Recomendaciones para Optimizar el Proyecto")
+            puntaje_sector = sectores_disponibles[sector_seleccionado]
 
-                tabs = st.tabs(["⚠️ Críticas", "📈 Importantes", "✨ Opcionales", "✅ Fortalezas"])
-
-                with tabs[0]:  # Críticas
-                    if recomendaciones['criticas']:
-                        st.markdown("**Aspectos que deben corregirse para mejorar significativamente:**")
-                        for rec in recomendaciones['criticas']:
-                            st.warning(rec)
-                    else:
-                        st.success("✅ No hay observaciones críticas")
-
-                with tabs[1]:  # Importantes
-                    if recomendaciones['importantes']:
-                        st.markdown("**Mejoras que aumentarían considerablemente el puntaje:**")
-                        for rec in recomendaciones['importantes']:
-                            st.info(rec)
-                    else:
-                        st.success("✅ Los aspectos importantes están bien cubiertos")
-
-                with tabs[2]:  # Opcionales
-                    if recomendaciones['opcionales']:
-                        st.markdown("**Optimizaciones adicionales:**")
-                        for rec in recomendaciones['opcionales']:
-                            st.markdown(f"- {rec}")
-                    else:
-                        st.info("No hay sugerencias opcionales en este momento")
-
-                with tabs[3]:  # Fortalezas
-                    if recomendaciones['fortalezas']:
-                        st.markdown("**Aspectos destacados del proyecto:**")
-                        for fortaleza in recomendaciones['fortalezas']:
-                            st.success(fortaleza)
-                    else:
-                        st.info("Implementa las recomendaciones para desarrollar fortalezas")
-
-            # Mostrar opciones después de guardar
-            st.markdown("---")
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
-                st.info("💡 Puedes crear otro proyecto o ir a 'Dashboard' para ver todos tus proyectos")
+                st.metric("Sector", sector_seleccionado.title())
             with col2:
-                if st.button("➕ Crear Otro Proyecto", type="primary", key="crear_otro"):
-                    # Limpiar selectores
-                    if 'departamentos_multiselect' in st.session_state:
-                        del st.session_state.departamentos_multiselect
-                    if 'municipios_multiselect' in st.session_state:
-                        del st.session_state.municipios_multiselect
-                    st.session_state.proyecto_guardado = False
-                    st.rerun()
+                st.metric("Puntaje Sectorial", f"{puntaje_sector}/10")
+            with col3:
+                score_prob = (puntaje_sector / 10) * 100
+                st.metric("Score Probabilidad", f"{score_prob:.0f}/100")
+        else:
+            st.warning("No hay datos de puntajes sectoriales para este municipio PDET")
+    else:
+        st.error("❌ Municipio NO-PDET - NO elegible para Obras por Impuestos")
+        st.caption("**Score Probabilidad de Aprobación = 0**")
+        st.info("💡 El proyecto puede compensar con alto SROI y buen perfil de Stakeholders")
 
-            # Mostrar resumen
-            with st.expander("📋 Ver Resumen del Proyecto", expanded=True):
-                col1, col2 = st.columns(2)
+    st.markdown("---")
 
-                with col1:
-                    st.markdown(f"""
-                    **ID:** {proyecto.id}
-                    **Nombre:** {proyecto.nombre}
-                    **Organización:** {proyecto.organizacion}
-                    **Duración:** {formatear_numero(proyecto.duracion_años, 1)} años
-                    **Presupuesto:** ${formatear_numero(proyecto.presupuesto_total)}
-                    """)
+    # ========== CRITERIO 3: STAKEHOLDERS (25%) ==========
+    st.markdown("## 🤝 Criterio 3: Stakeholders (25%)")
 
-                with col2:
-                    st.markdown(f"""
-                    **Beneficiarios Totales:** {formatear_numero(proyecto.beneficiarios_totales, 0)}
-                    **Costo por beneficiario:** ${formatear_numero(proyecto.presupuesto_por_beneficiario)}
-                    **Área:** {proyecto.area_geografica.value}
-                    **ODS:** {', '.join(proyecto.ods_vinculados)}
-                    """)
+    st.markdown("""
+    Evalúa el relacionamiento con stakeholders y la pertinencia operacional para ENLAZA.
+    """)
 
-        except ValueError as e:
-            st.error(f"❌ Error al crear proyecto: {str(e)}")
-        except Exception as e:
-            st.error(f"❌ Error inesperado: {str(e)}")
+    col1, col2 = st.columns(2)
 
-    if cancel:
-        st.info("Operación cancelada")
+    with col1:
+        st.markdown("**Pertinencia Operacional/Reputacional**")
+        st.caption("¿Qué tan crítico es para operaciones de ENLAZA?")
 
-    # Mostrar proyectos existentes
-    if len(st.session_state.proyectos) > 0:
+        pertinencia = st.select_slider(
+            "Nivel de Pertinencia *",
+            options=[1, 2, 3, 4, 5],
+            value=3,
+            format_func=lambda x: {
+                1: "1 - Nula",
+                2: "2 - Baja",
+                3: "3 - Media",
+                4: "4 - Alta",
+                5: "5 - Muy Alta"
+            }[x],
+            help="Evalúa criticidad para licencia social y operaciones"
+        )
+
+        if pertinencia >= 4:
+            st.info(f"{'⭐' if pertinencia == 5 else '📊'} Proyecto {'crítico' if pertinencia == 5 else 'importante'} para operaciones")
+
+    with col2:
+        st.markdown("**Mejora del Relacionamiento**")
+        st.caption("¿Cómo mejora relación con stakeholders?")
+
+        relacionamiento = st.select_slider(
+            "Nivel de Mejora *",
+            options=[1, 2, 3, 4, 5],
+            value=3,
+            format_func=lambda x: {
+                1: "1 - No aporta",
+                2: "2 - Limitado",
+                3: "3 - Moderado",
+                4: "4 - Confianza",
+                5: "5 - Sustancial"
+            }[x],
+            help="Evalúa impacto en percepción de ENLAZA"
+        )
+
+        if relacionamiento >= 4:
+            st.info(f"{'⭐' if relacionamiento == 5 else '📊'} Mejora {'sustancial' if relacionamiento == 5 else 'significativa'}")
+
+    corredor = st.checkbox(
+        "✅ Proyecto ubicado en corredor de transmisión",
+        help="Proyecto en zona con líneas de transmisión actuales o futuras"
+    )
+
+    st.markdown("**Stakeholders Involucrados**")
+    st.caption("Seleccione los tipos de stakeholders clave:")
+
+    col1, col2 = st.columns(2)
+
+    stakeholders = []
+    with col1:
+        if st.checkbox("Autoridades municipales/departamentales", value=True):
+            stakeholders.append('autoridades_locales')
+        if st.checkbox("Líderes comunitarios/JAC"):
+            stakeholders.append('lideres_comunitarios')
+        if st.checkbox("Comunidades indígenas/étnicas"):
+            stakeholders.append('comunidades_indigenas')
+        if st.checkbox("Organizaciones sociales locales"):
+            stakeholders.append('organizaciones_sociales')
+
+    with col2:
+        if st.checkbox("Sector privado local"):
+            stakeholders.append('sector_privado')
+        if st.checkbox("Academia/instituciones educativas"):
+            stakeholders.append('academia')
+        if st.checkbox("Medios de comunicación"):
+            stakeholders.append('medios_comunicacion')
+
+    if stakeholders:
+        st.success(f"✅ {len(stakeholders)} tipo(s) de stakeholders seleccionados")
+    else:
+        st.warning("⚠️ No se han seleccionado stakeholders")
+
+    st.markdown("---")
+
+    # ========== CRITERIO 4: RIESGOS (15%) ==========
+    st.markdown("## ⚠️ Criterio 4: Evaluación de Riesgos (15%)")
+
+    st.markdown("""
+    Evalúa riesgos en 4 dimensiones. **Score INVERSO**: más riesgo = menos puntos
+
+    **Nivel de Riesgo** = Probabilidad × Impacto
+    - 1-5: BAJO 🟢
+    - 6-12: MEDIO 🟡
+    - 13-20: ALTO 🟠
+    - 21-25: CRÍTICO 🔴
+    """)
+
+    with st.expander("ℹ️ Guía de Evaluación"):
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            st.markdown("""
+            **Probabilidad (1-5):**
+            - 1: Muy baja (< 10%)
+            - 2: Baja (10-30%)
+            - 3: Media (30-50%)
+            - 4: Alta (50-70%)
+            - 5: Muy alta (> 70%)
+            """)
+        with col_g2:
+            st.markdown("""
+            **Impacto (1-5):**
+            - 1: Insignificante
+            - 2: Menor
+            - 3: Moderado
+            - 4: Mayor
+            - 5: Catastrófico
+            """)
+
+    # Riesgo Técnico
+    st.markdown("**1. Riesgo Técnico/Operacional**")
+    st.caption("Complejidad técnica, recursos, experiencia")
+
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        riesgo_tec_prob = st.slider("Probabilidad", 1, 5, 2, key="tec_prob")
+    with col2:
+        riesgo_tec_imp = st.slider("Impacto", 1, 5, 2, key="tec_imp")
+    with col3:
+        nivel_tec = riesgo_tec_prob * riesgo_tec_imp
+        color = "🟢" if nivel_tec <= 5 else "🟡" if nivel_tec <= 12 else "🟠" if nivel_tec <= 20 else "🔴"
+        st.metric("Nivel", f"{color} {nivel_tec}")
+
+    # Riesgo Social
+    st.markdown("**2. Riesgo Social/Comunitario**")
+    st.caption("Aceptación comunitaria, conflictos sociales")
+
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        riesgo_soc_prob = st.slider("Probabilidad", 1, 5, 2, key="soc_prob")
+    with col2:
+        riesgo_soc_imp = st.slider("Impacto", 1, 5, 2, key="soc_imp")
+    with col3:
+        nivel_soc = riesgo_soc_prob * riesgo_soc_imp
+        color = "🟢" if nivel_soc <= 5 else "🟡" if nivel_soc <= 12 else "🟠" if nivel_soc <= 20 else "🔴"
+        st.metric("Nivel", f"{color} {nivel_soc}")
+
+    # Riesgo Financiero
+    st.markdown("**3. Riesgo Financiero/Presupuestario**")
+    st.caption("Desviaciones presupuestarias, sobrecostos")
+
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        riesgo_fin_prob = st.slider("Probabilidad", 1, 5, 2, key="fin_prob")
+    with col2:
+        riesgo_fin_imp = st.slider("Impacto", 1, 5, 3, key="fin_imp")
+    with col3:
+        nivel_fin = riesgo_fin_prob * riesgo_fin_imp
+        color = "🟢" if nivel_fin <= 5 else "🟡" if nivel_fin <= 12 else "🟠" if nivel_fin <= 20 else "🔴"
+        st.metric("Nivel", f"{color} {nivel_fin}")
+
+    # Riesgo Regulatorio
+    st.markdown("**4. Riesgo Regulatorio/Legal**")
+    st.caption("Permisos, licencias, cambios regulatorios")
+
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        riesgo_reg_prob = st.slider("Probabilidad", 1, 5, 2, key="reg_prob")
+    with col2:
+        riesgo_reg_imp = st.slider("Impacto", 1, 5, 2, key="reg_imp")
+    with col3:
+        nivel_reg = riesgo_reg_prob * riesgo_reg_imp
+        color = "🟢" if nivel_reg <= 5 else "🟡" if nivel_reg <= 12 else "🟠" if nivel_reg <= 20 else "🔴"
+        st.metric("Nivel", f"{color} {nivel_reg}")
+
+    # Resumen riesgos
+    max_nivel = max(nivel_tec, nivel_soc, nivel_fin, nivel_reg)
+    if max_nivel >= 20:
+        st.error("🔴 **Uno o más riesgos CRÍTICOS detectados**")
+    elif max_nivel >= 13:
+        st.warning("🟠 **Uno o más riesgos ALTOS detectados**")
+    elif max_nivel >= 6:
+        st.info("🟡 **Perfil de riesgo MEDIO**")
+    else:
+        st.success("🟢 **Perfil de riesgo BAJO**")
+
+    st.markdown("---")
+
+    # Botón guardar criterios
+    if st.button("✅ Guardar Criterios y Continuar a Revisión", type="primary", use_container_width=True):
+        st.session_state.criterios = {
+            'sroi': sroi,
+            'sector_seleccionado': sector_seleccionado,
+            'puntaje_sector': puntaje_sector,
+            'pertinencia': pertinencia,
+            'relacionamiento': relacionamiento,
+            'corredor': corredor,
+            'stakeholders': stakeholders,
+            'riesgo_tec_prob': riesgo_tec_prob,
+            'riesgo_tec_imp': riesgo_tec_imp,
+            'riesgo_soc_prob': riesgo_soc_prob,
+            'riesgo_soc_imp': riesgo_soc_imp,
+            'riesgo_fin_prob': riesgo_fin_prob,
+            'riesgo_fin_imp': riesgo_fin_imp,
+            'riesgo_reg_prob': riesgo_reg_prob,
+            'riesgo_reg_imp': riesgo_reg_imp
+        }
+
+        st.success("✅ Criterios guardados. Continúe a la pestaña 'Revisión y Cálculo'")
+        st.rerun()
+
+    return st.session_state.get('criterios', None)
+
+
+# ============================================================================
+# SECCION 3: REVISION Y CALCULO
+# ============================================================================
+
+def seccion_revision_calculo(datos_basicos: Dict, criterios: Dict):
+    """Revisión final y cálculo de score con Motor Arquitectura C"""
+
+    st.markdown("## 📊 Revisión y Cálculo de Score")
+
+    st.info("""
+    Revise la información del proyecto antes de calcular el score.
+    El cálculo utiliza el **Motor Arquitectura C** con los siguientes pesos:
+    - SROI: 40% (dominante)
+    - Stakeholders: 25%
+    - Probabilidad Aprobación: 20%
+    - Riesgos: 15%
+    """)
+
+    # Resumen
+    st.markdown("### Resumen del Proyecto")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown(f"""
+        **📋 Datos Básicos:**
+        - **Nombre:** {datos_basicos['nombre']}
+        - **Organización:** {datos_basicos['organizacion']}
+        - **Presupuesto:** ${formatear_numero(datos_basicos['presupuesto'], 0)} COP
+        - **Beneficiarios:** {formatear_numero(datos_basicos['beneficiarios_directos'], 0)} directos
+        - **Duración:** {datos_basicos['duracion']} meses
+        - **Ubicación:** {datos_basicos['municipio']}, {datos_basicos['departamento']}
+        - **PDET:** {'✅ Sí' if datos_basicos['es_pdet'] else '❌ No'}
+        """)
+
+    with col2:
+        st.markdown(f"""
+        **🎯 Criterios:**
+
+        **SROI (40%):** {criterios['sroi']:.2f}
+
+        **Probabilidad (20%):**
+        {criterios['sector_seleccionado'].title() if criterios['sector_seleccionado'] else 'N/A'} ({criterios['puntaje_sector']}/10)
+
+        **Stakeholders (25%):**
+        - Pertinencia: {criterios['pertinencia']}/5
+        - Relacionamiento: {criterios['relacionamiento']}/5
+        - Corredor: {'✅' if criterios['corredor'] else '❌'}
+        - Tipos: {len(criterios['stakeholders'])}
+
+        **Riesgos (15%):**
+        - Técnico: {criterios['riesgo_tec_prob']}×{criterios['riesgo_tec_imp']}={criterios['riesgo_tec_prob']*criterios['riesgo_tec_imp']}
+        - Social: {criterios['riesgo_soc_prob']}×{criterios['riesgo_soc_imp']}={criterios['riesgo_soc_prob']*criterios['riesgo_soc_imp']}
+        - Financiero: {criterios['riesgo_fin_prob']}×{criterios['riesgo_fin_imp']}={criterios['riesgo_fin_prob']*criterios['riesgo_fin_imp']}
+        - Regulatorio: {criterios['riesgo_reg_prob']}×{criterios['riesgo_reg_imp']}={criterios['riesgo_reg_prob']*criterios['riesgo_reg_imp']}
+        """)
+
+    st.markdown("---")
+
+    # Botón calcular
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        calcular = st.button(
+            "🚀 Calcular Score con Motor Arquitectura C",
+            type="primary",
+            use_container_width=True
+        )
+
+    with col2:
+        if st.button("🔄 Editar Datos", use_container_width=True):
+            st.info("Regrese a las pestañas anteriores para editar")
+
+    if calcular:
+        with st.spinner("Calculando score..."):
+            # Crear ProyectoSocial
+            proyecto = ProyectoSocial(
+                nombre=datos_basicos['nombre'],
+                organizacion=datos_basicos['organizacion'],
+                descripcion=datos_basicos['descripcion'],
+                presupuesto_total=datos_basicos['presupuesto'],
+                beneficiarios_directos=datos_basicos['beneficiarios_directos'],
+                beneficiarios_indirectos=datos_basicos['beneficiarios_indirectos'],
+                duracion_estimada_meses=datos_basicos['duracion'],
+                duracion_meses=datos_basicos['duracion'],
+
+                # Ubicación
+                departamentos=[datos_basicos['departamento']],
+                municipios=[datos_basicos['municipio']],
+                area_geografica=AreaGeografica.RURAL,
+                poblacion_objetivo="Comunidad local",
+
+                # SROI
+                indicadores_impacto={'sroi': criterios['sroi']},
+
+                # Probabilidad (PDET)
+                tiene_municipios_pdet=datos_basicos['es_pdet'],
+                puntajes_pdet={criterios['sector_seleccionado']: criterios['puntaje_sector']} if criterios['sector_seleccionado'] else {},
+                puntaje_sectorial_max=criterios['puntaje_sector'],
+                sectores=[criterios['sector_seleccionado']] if criterios['sector_seleccionado'] else [],
+
+                # Stakeholders
+                pertinencia_operacional=criterios['pertinencia'],
+                mejora_relacionamiento=criterios['relacionamiento'],
+                en_corredor_transmision=criterios['corredor'],
+                stakeholders_involucrados=criterios['stakeholders'],
+
+                # Riesgos
+                riesgo_tecnico_probabilidad=criterios['riesgo_tec_prob'],
+                riesgo_tecnico_impacto=criterios['riesgo_tec_imp'],
+                riesgo_social_probabilidad=criterios['riesgo_soc_prob'],
+                riesgo_social_impacto=criterios['riesgo_soc_imp'],
+                riesgo_financiero_probabilidad=criterios['riesgo_fin_prob'],
+                riesgo_financiero_impacto=criterios['riesgo_fin_imp'],
+                riesgo_regulatorio_probabilidad=criterios['riesgo_reg_prob'],
+                riesgo_regulatorio_impacto=criterios['riesgo_reg_imp']
+            )
+
+            # Calcular score
+            resultado = calcular_score_proyecto(proyecto)
+
+        # Guardar en session state
+        st.session_state.ultimo_resultado = resultado
+        st.session_state.ultimo_proyecto = proyecto
+
+        # Mostrar resultado
+        mostrar_resultado(resultado, proyecto, datos_basicos)
+
+
+def mostrar_resultado(resultado, proyecto, datos_basicos):
+    """Muestra el resultado del cálculo de score"""
+
+    st.success("✅ Score calculado exitosamente")
+
+    st.markdown("---")
+    st.markdown("## 🎯 Resultado Final")
+
+    # Score total con gradiente
+    if resultado.score_total >= 85:
+        color_bg = "#22c55e"
+        emoji = "🟢"
+    elif resultado.score_total >= 70:
+        color_bg = "#eab308"
+        emoji = "🟡"
+    elif resultado.score_total >= 50:
+        color_bg = "#f97316"
+        emoji = "🟠"
+    else:
+        color_bg = "#ef4444"
+        emoji = "🔴"
+
+    st.markdown(f"""
+    <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, {color_bg} 0%, {color_bg}dd 100%);
+                border-radius: 15px; margin: 20px 0;'>
+        <h1 style='color: white; margin: 0; font-size: 4em;'>{emoji} {resultado.score_total:.1f}</h1>
+        <h2 style='color: white; margin: 10px 0;'>{resultado.nivel_prioridad}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Desglose
+    st.markdown("### 📊 Desglose por Criterio (Arquitectura C)")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown("**SROI (40%)**")
+        st.metric(
+            "Score",
+            f"{resultado.score_sroi:.0f}/100",
+            delta=f"{resultado.contribucion_sroi:.1f} pts"
+        )
+        st.progress(resultado.score_sroi / 100)
+
+    with col2:
+        st.markdown("**Stakeholders (25%)**")
+        st.metric(
+            "Score",
+            f"{resultado.score_stakeholders:.0f}/100",
+            delta=f"{resultado.contribucion_stakeholders:.1f} pts"
+        )
+        st.progress(resultado.score_stakeholders / 100)
+
+    with col3:
+        st.markdown("**Probabilidad (20%)**")
+        st.metric(
+            "Score",
+            f"{resultado.score_probabilidad:.0f}/100",
+            delta=f"{resultado.contribucion_probabilidad:.1f} pts"
+        )
+        st.progress(resultado.score_probabilidad / 100)
+
+    with col4:
+        st.markdown("**Riesgos (15%)**")
+        st.metric(
+            "Score",
+            f"{resultado.score_riesgos:.0f}/100",
+            delta=f"{resultado.contribucion_riesgos:.1f} pts"
+        )
+        st.progress(resultado.score_riesgos / 100)
+
+    # Validación aritmética
+    suma = resultado.contribucion_sroi + resultado.contribucion_stakeholders + resultado.contribucion_probabilidad + resultado.contribucion_riesgos
+    st.caption(f"✅ Validación: {resultado.contribucion_sroi:.1f} + {resultado.contribucion_stakeholders:.1f} + {resultado.contribucion_probabilidad:.1f} + {resultado.contribucion_riesgos:.1f} = {suma:.1f}/100")
+
+    # Alertas
+    if resultado.alertas:
         st.markdown("---")
-        st.markdown("### 📚 Proyectos Registrados")
+        st.markdown("### 🔔 Alertas")
+        for alerta in resultado.alertas:
+            if "RECHAZADO" in alerta or "CRÍTICO" in alerta:
+                st.error(alerta)
+            elif "ALTO" in alerta or "⚠️" in alerta:
+                st.warning(alerta)
+            else:
+                st.info(alerta)
 
-        # Inicializar la lista de proyectos a eliminar si no existe
-        if 'proyectos_a_eliminar' not in st.session_state:
-            st.session_state.proyectos_a_eliminar = []
+    # Recomendaciones
+    if resultado.recomendaciones:
+        st.markdown("### 💡 Recomendaciones")
+        for rec in resultado.recomendaciones:
+            st.info(rec)
 
-        for idx, proyecto in enumerate(st.session_state.proyectos):
-            with st.expander(f"**{idx + 1}. {proyecto.nombre}** - {proyecto.organizacion}"):
-                col1, col2, col3 = st.columns(3)
+    # Botones de acción
+    st.markdown("---")
 
-                with col1:
-                    st.markdown(f"""
-                    **ID:** {proyecto.id}
-                    **Duración:** {formatear_numero(proyecto.duracion_años, 1)} años
-                    **Presupuesto:** ${formatear_numero(proyecto.presupuesto_total)}
-                    """)
+    col1, col2, col3 = st.columns(3)
 
-                with col2:
-                    st.markdown(f"""
-                    **Beneficiarios:** {formatear_numero(proyecto.beneficiarios_totales, 0)}
-                    **Área:** {proyecto.area_geografica.value}
-                    **Estado:** {proyecto.estado.value}
-                    """)
+    with col1:
+        if st.button("💾 Guardar Proyecto", type="primary", use_container_width=True):
+            db = get_db()
+            try:
+                db.guardar_proyecto(proyecto)
+                st.session_state.proyectos.append(proyecto)
+                st.success("✅ Proyecto guardado en la base de datos")
+                st.balloons()
+            except Exception as e:
+                st.error(f"❌ Error al guardar: {str(e)}")
 
-                with col3:
-                    st.markdown(f"""
-                    **Departamentos:**
-                    {', '.join(proyecto.departamentos)}
-                    """)
+    with col2:
+        if st.button("🔄 Nuevo Proyecto", use_container_width=True):
+            limpiar_session_state()
+            st.rerun()
 
-                    if proyecto.municipios:
-                        st.markdown(f"""
-                        **Municipios:**
-                        {', '.join(proyecto.municipios)}
-                        """)
+    with col3:
+        if st.button("📊 Ver en Cartera", use_container_width=True):
+            st.info("Navegue al menú 'Evaluar Cartera' para ver el proyecto")
 
-                # Botón para eliminar proyecto
-                st.markdown("---")
-                if st.button(f"🗑️ Eliminar Proyecto", key=f"delete_{proyecto.id}_{idx}", type="secondary"):
-                    st.session_state.proyectos_a_eliminar.append(idx)
-                    st.rerun()
 
-        # Eliminar proyectos marcados
-        if st.session_state.proyectos_a_eliminar:
-            db = get_db_manager()
-            # Eliminar en orden inverso para no afectar los índices
-            for idx in sorted(st.session_state.proyectos_a_eliminar, reverse=True):
-                if idx < len(st.session_state.proyectos):
-                    proyecto_eliminado = st.session_state.proyectos[idx]
-                    # Eliminar de la base de datos
-                    if db.eliminar_proyecto(proyecto_eliminado.id):
-                        st.success(f"✅ Proyecto '{proyecto_eliminado.nombre}' eliminado correctamente")
-                    else:
-                        st.error(f"❌ Error al eliminar proyecto '{proyecto_eliminado.nombre}'")
-            # Recargar proyectos desde BD
-            st.session_state.proyectos = db.obtener_todos_proyectos()
-            st.session_state.proyectos_a_eliminar = []
+# ============================================================================
+# FUNCION PRINCIPAL
+# ============================================================================
+
+def show():
+    """Función principal de la página"""
+
+    st.markdown("<h1 class='main-header'>➕ Nuevo Proyecto con Arquitectura C</h1>",
+                unsafe_allow_html=True)
+    st.markdown("---")
+
+    st.info("""
+    **Sistema de Priorización - Arquitectura C**
+
+    Complete los 3 pasos para registrar un proyecto y calcular su score de priorización:
+    1. **Datos Básicos** - Información general y ubicación
+    2. **Criterios de Evaluación** - SROI, Stakeholders, Probabilidad y Riesgos
+    3. **Revisión y Cálculo** - Verificación final y cálculo automático de score
+    """)
+
+    # Tabs para organizar el formulario
+    tab1, tab2, tab3 = st.tabs([
+        "📋 Paso 1: Datos Básicos",
+        "🎯 Paso 2: Criterios de Evaluación",
+        "📊 Paso 3: Revisión y Cálculo"
+    ])
+
+    with tab1:
+        datos_basicos = seccion_datos_basicos()
+
+        if not datos_basicos:
+            st.info("👆 Complete el formulario arriba para continuar")
+
+    with tab2:
+        datos_basicos = st.session_state.get('datos_basicos', None)
+
+        if datos_basicos:
+            criterios = seccion_criterios_evaluacion(datos_basicos)
+        else:
+            st.warning("⚠️ Primero complete el Paso 1: Datos Básicos")
+            criterios = None
+
+    with tab3:
+        datos_basicos = st.session_state.get('datos_basicos', None)
+        criterios = st.session_state.get('criterios', None)
+
+        if datos_basicos and criterios:
+            seccion_revision_calculo(datos_basicos, criterios)
+        else:
+            st.warning("⚠️ Complete los pasos anteriores primero")
+            if not datos_basicos:
+                st.error("❌ Falta: Datos Básicos")
+            if not criterios:
+                st.error("❌ Falta: Criterios de Evaluación")
+
+    # Botón para limpiar todo
+    st.markdown("---")
+    if st.button("🗑️ Limpiar Todo y Empezar de Nuevo"):
+        limpiar_session_state()
+        st.rerun()
