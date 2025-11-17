@@ -97,6 +97,31 @@ class ProyectoSocial:
     observaciones_stakeholders: str = ""
     # Max 1000 caracteres, para explicar contexto específico
 
+    # ========== NUEVOS: Criterio Riesgos - Arquitectura C ==========
+
+    # Riesgo Técnico/Operacional
+    riesgo_tecnico_probabilidad: Optional[int] = None  # 1-5
+    riesgo_tecnico_impacto: Optional[int] = None  # 1-5
+
+    # Riesgo Social/Comunitario
+    riesgo_social_probabilidad: Optional[int] = None  # 1-5
+    riesgo_social_impacto: Optional[int] = None  # 1-5
+
+    # Riesgo Financiero/Presupuestario
+    riesgo_financiero_probabilidad: Optional[int] = None  # 1-5
+    riesgo_financiero_impacto: Optional[int] = None  # 1-5
+
+    # Riesgo Regulatorio/Legal
+    riesgo_regulatorio_probabilidad: Optional[int] = None  # 1-5
+    riesgo_regulatorio_impacto: Optional[int] = None  # 1-5
+
+    # Duración estimada (meses)
+    duracion_estimada_meses: Optional[int] = None
+
+    # Observaciones riesgos (opcional)
+    observaciones_riesgos: str = ""
+    # Max 1000 caracteres
+
     # Metadata
     fecha_presentacion: str = ""
     contacto_organizacion: str = ""
@@ -187,6 +212,49 @@ class ProyectoSocial:
                 'nivel': 'BAJA',
                 'requiere_observaciones': False
             }
+
+    def validar_riesgos(self) -> Dict[str, Any]:
+        """
+        Valida datos del criterio Riesgos
+
+        Returns:
+            Dict con 'valido', 'errores', 'advertencias', 'mensaje'
+        """
+        errores = []
+        advertencias = []
+
+        # Validar cada tipo de riesgo
+        riesgos = [
+            ('técnico', self.riesgo_tecnico_probabilidad, self.riesgo_tecnico_impacto),
+            ('social', self.riesgo_social_probabilidad, self.riesgo_social_impacto),
+            ('financiero', self.riesgo_financiero_probabilidad, self.riesgo_financiero_impacto),
+            ('regulatorio', self.riesgo_regulatorio_probabilidad, self.riesgo_regulatorio_impacto)
+        ]
+
+        for nombre, prob, imp in riesgos:
+            if prob is None or imp is None:
+                errores.append(f"Riesgo {nombre}: probabilidad e impacto requeridos")
+            else:
+                if prob not in [1, 2, 3, 4, 5]:
+                    errores.append(f"Riesgo {nombre}: probabilidad inválida ({prob})")
+                if imp not in [1, 2, 3, 4, 5]:
+                    errores.append(f"Riesgo {nombre}: impacto inválido ({imp})")
+
+                # Advertencias para riesgos altos
+                if prob and imp:
+                    nivel = prob * imp
+                    if nivel >= 16:
+                        advertencias.append(
+                            f"⚠️  Riesgo {nombre} ALTO (nivel {nivel}): "
+                            f"Considerar plan de mitigación"
+                        )
+
+        return {
+            'valido': len(errores) == 0,
+            'errores': errores,
+            'advertencias': advertencias,
+            'mensaje': errores[0] if errores else "Validación exitosa"
+        }
 
     def validar_stakeholders(self) -> Dict[str, Any]:
         """

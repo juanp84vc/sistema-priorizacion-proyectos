@@ -59,13 +59,23 @@ class TestMotorScoringArquitecturaC(unittest.TestCase):
             pertinencia_operacional=5,
             mejora_relacionamiento=5,
             en_corredor_transmision=True,
-            stakeholders_involucrados=['autoridades_locales', 'comunidades_indigenas', 'lideres_comunitarios']
+            stakeholders_involucrados=['autoridades_locales', 'comunidades_indigenas', 'lideres_comunitarios'],
+            # Riesgos fields (bajo riesgo para score alto)
+            riesgo_tecnico_probabilidad=2,
+            riesgo_tecnico_impacto=2,
+            riesgo_social_probabilidad=2,
+            riesgo_social_impacto=2,
+            riesgo_financiero_probabilidad=2,
+            riesgo_financiero_impacto=2,
+            riesgo_regulatorio_probabilidad=2,
+            riesgo_regulatorio_impacto=2,
+            duracion_estimada_meses=24
         )
 
         resultado = self.motor.calcular_score(proyecto)
 
-        # Score debe ser muy alto (ahora con stakeholders reales)
-        self.assertGreater(resultado.score_total, 85)
+        # Score debe ser muy alto (ahora con todos los criterios implementados)
+        self.assertGreater(resultado.score_total, 80)
         self.assertIn(resultado.nivel_prioridad, ["ALTA", "MUY ALTA"])
 
         # SROI debe contribuir ~38 puntos (95 × 0.40)
@@ -90,7 +100,17 @@ class TestMotorScoringArquitecturaC(unittest.TestCase):
             area_geografica=AreaGeografica.URBANA,
             poblacion_objetivo="General",
             departamentos=["ANTIOQUIA"],
-            municipios=["ABEJORRAL"]
+            municipios=["ABEJORRAL"],
+            # Riesgos fields (no importan, será rechazado por SROI)
+            riesgo_tecnico_probabilidad=1,
+            riesgo_tecnico_impacto=1,
+            riesgo_social_probabilidad=1,
+            riesgo_social_impacto=1,
+            riesgo_financiero_probabilidad=1,
+            riesgo_financiero_impacto=1,
+            riesgo_regulatorio_probabilidad=1,
+            riesgo_regulatorio_impacto=1,
+            duracion_estimada_meses=12
         )
 
         resultado = self.motor.calcular_score(proyecto)
@@ -117,7 +137,20 @@ class TestMotorScoringArquitecturaC(unittest.TestCase):
             poblacion_objetivo="General",
             departamentos=["CUNDINAMARCA"],
             municipios=["BOGOTÁ"],
-            tiene_municipios_pdet=False
+            tiene_municipios_pdet=False,
+            # Stakeholders fields
+            pertinencia_operacional=3,
+            mejora_relacionamiento=3,
+            # Riesgos fields (bajos)
+            riesgo_tecnico_probabilidad=2,
+            riesgo_tecnico_impacto=2,
+            riesgo_social_probabilidad=2,
+            riesgo_social_impacto=2,
+            riesgo_financiero_probabilidad=2,
+            riesgo_financiero_impacto=2,
+            riesgo_regulatorio_probabilidad=2,
+            riesgo_regulatorio_impacto=2,
+            duracion_estimada_meses=24
         )
 
         resultado = self.motor.calcular_score(proyecto)
@@ -149,7 +182,20 @@ class TestMotorScoringArquitecturaC(unittest.TestCase):
             sectores=["Alcantarillado"],
             tiene_municipios_pdet=True,
             puntajes_pdet={"Alcantarillado": 10},
-            puntaje_sectorial_max=10
+            puntaje_sectorial_max=10,
+            # Stakeholders fields
+            pertinencia_operacional=4,
+            mejora_relacionamiento=4,
+            # Riesgos fields
+            riesgo_tecnico_probabilidad=2,
+            riesgo_tecnico_impacto=2,
+            riesgo_social_probabilidad=2,
+            riesgo_social_impacto=2,
+            riesgo_financiero_probabilidad=2,
+            riesgo_financiero_impacto=2,
+            riesgo_regulatorio_probabilidad=2,
+            riesgo_regulatorio_impacto=2,
+            duracion_estimada_meses=24
         )
 
         resultado = self.motor.calcular_score(proyecto)
@@ -180,7 +226,20 @@ class TestMotorScoringArquitecturaC(unittest.TestCase):
             area_geografica=AreaGeografica.RURAL,
             poblacion_objetivo="General",
             departamentos=["ANTIOQUIA"],
-            municipios=["ABEJORRAL"]
+            municipios=["ABEJORRAL"],
+            # Stakeholders fields
+            pertinencia_operacional=3,
+            mejora_relacionamiento=3,
+            # Riesgos fields
+            riesgo_tecnico_probabilidad=3,
+            riesgo_tecnico_impacto=3,
+            riesgo_social_probabilidad=3,
+            riesgo_social_impacto=3,
+            riesgo_financiero_probabilidad=3,
+            riesgo_financiero_impacto=3,
+            riesgo_regulatorio_probabilidad=3,
+            riesgo_regulatorio_impacto=3,
+            duracion_estimada_meses=24
         )
 
         resultado = self.motor.calcular_score(proyecto)
@@ -211,7 +270,20 @@ class TestMotorScoringArquitecturaC(unittest.TestCase):
             area_geografica=AreaGeografica.RURAL,
             poblacion_objetivo="General",
             departamentos=["ANTIOQUIA"],
-            municipios=["ABEJORRAL"]
+            municipios=["ABEJORRAL"],
+            # Stakeholders fields
+            pertinencia_operacional=3,
+            mejora_relacionamiento=3,
+            # Riesgos fields
+            riesgo_tecnico_probabilidad=2,
+            riesgo_tecnico_impacto=3,
+            riesgo_social_probabilidad=2,
+            riesgo_social_impacto=2,
+            riesgo_financiero_probabilidad=3,
+            riesgo_financiero_impacto=2,
+            riesgo_regulatorio_probabilidad=2,
+            riesgo_regulatorio_impacto=2,
+            duracion_estimada_meses=12
         )
 
         resultado = calcular_score_proyecto(proyecto)

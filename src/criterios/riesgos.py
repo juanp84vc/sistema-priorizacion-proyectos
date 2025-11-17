@@ -1,259 +1,386 @@
 """
-Criterio de Evaluación de Riesgos.
-Evalúa los riesgos tecnológicos, regulatorios, financieros, sociales, etc.
-asociados a la ejecución del proyecto.
+Criterio de evaluación: Riesgos
+Arquitectura C - Peso: 15%
+
+Este criterio evalúa riesgos del proyecto en múltiples dimensiones:
+1. Riesgo Técnico/Operacional (30%)
+2. Riesgo Social/Comunitario (25%)
+3. Riesgo Financiero/Presupuestario (20%)
+4. Riesgo Regulatorio/Legal (15%)
+5. Factores Automáticos de Riesgo (10%)
+
+Metodología: Score INVERSO
+- Más riesgo → Score más bajo
+- Menos riesgo → Score más alto
+
+Scoring permite identificar proyectos con perfil de riesgo favorable.
 """
-from criterios.base import CriterioEvaluacion
-from models.proyecto import ProyectoSocial
+
+from dataclasses import dataclass
+from typing import Dict, Any, List, Optional
+from src.models.proyecto import ProyectoSocial
 
 
-class RiesgosCriterio(CriterioEvaluacion):
+@dataclass
+class ResultadoRiesgos:
+    """Resultado detallado de evaluación Riesgos"""
+    score: float  # 0-100
+
+    # Niveles de riesgo (1-25)
+    nivel_riesgo_tecnico: int
+    nivel_riesgo_social: int
+    nivel_riesgo_financiero: int
+    nivel_riesgo_regulatorio: int
+
+    # Scores por componente (0-100, inverso)
+    score_riesgo_tecnico: float
+    score_riesgo_social: float
+    score_riesgo_financiero: float
+    score_riesgo_regulatorio: float
+    score_factores_automaticos: float
+
+    # Contribuciones
+    contribucion_tecnico: float
+    contribucion_social: float
+    contribucion_financiero: float
+    contribucion_regulatorio: float
+    contribucion_automaticos: float
+
+    # Metadata
+    nivel_general: str  # "BAJO", "MEDIO", "ALTO", "CRÍTICO"
+    mensaje: str
+    alertas: List[str]
+    recomendaciones: List[str]
+
+
+class RiesgosCriterio:
     """
-    Evalúa los riesgos asociados a la ejecución del proyecto.
+    Evalúa riesgos del proyecto en múltiples dimensiones.
 
-    Considera:
-    - Riesgo financiero (presupuesto vs alcance)
-    - Riesgo de sostenibilidad (duración y costo operativo)
-    - Riesgo de alcance (complejidad geográfica)
-    - Riesgo operativo (capacidad organizacional)
+    Criterio: 15% del score total (Arquitectura C)
 
-    Nota: A menor riesgo, mayor score (inverso)
+    Score INVERSO: Más riesgo = Menos puntos
+
+    Componentes:
+    - Riesgo Técnico/Operacional (30%)
+    - Riesgo Social/Comunitario (25%)
+    - Riesgo Financiero/Presupuestario (20%)
+    - Riesgo Regulatorio/Legal (15%)
+    - Factores Automáticos (10%)
     """
 
-    def __init__(
-        self,
-        peso: float = 0.25,
-        umbral_riesgo_alto: float = 60,
-        umbral_riesgo_medio: float = 75
-    ):
-        """
-        Args:
-            peso: Peso del criterio en la evaluación total
-            umbral_riesgo_alto: Score por debajo del cual se considera riesgo alto
-            umbral_riesgo_medio: Score por debajo del cual se considera riesgo medio
-        """
-        super().__init__(peso)
-        self.umbral_alto = umbral_riesgo_alto
-        self.umbral_medio = umbral_riesgo_medio
+    # Pesos de componentes
+    PESO_TECNICO = 0.30
+    PESO_SOCIAL = 0.25
+    PESO_FINANCIERO = 0.20
+    PESO_REGULATORIO = 0.15
+    PESO_AUTOMATICOS = 0.10
+
+    def __init__(self, peso: float = 0.15):
+        self.peso = peso
+        self.nombre = "Evaluación de Riesgos"
+        self.descripcion = "Evalúa riesgos técnicos, sociales, financieros y regulatorios"
 
     def evaluar(self, proyecto: ProyectoSocial) -> float:
         """
-        Evalúa los riesgos del proyecto.
-
-        Metodología:
-        1. Evalúa riesgo financiero (presupuesto vs beneficiarios)
-        2. Evalúa riesgo de sostenibilidad temporal
-        3. Evalúa riesgo de complejidad geográfica
-        4. Evalúa riesgo operativo
-        5. Combina riesgos en score total
-        6. Invierte escala: bajo riesgo = alto score
-
-        Returns:
-            Score de 0-100 (100 = bajo riesgo, alta seguridad de éxito)
-        """
-        riesgo_total = 0
-
-        # 1. Riesgo financiero (30 puntos)
-        # Basado en costo por beneficiario y presupuesto total
-        costo_por_beneficiario = proyecto.presupuesto_por_beneficiario
-        presupuesto_total = proyecto.presupuesto_total
-
-        # Riesgo por costo unitario alto
-        if costo_por_beneficiario <= 1000:
-            riesgo_financiero_unitario = 15  # Bajo riesgo
-        elif costo_por_beneficiario <= 3000:
-            riesgo_financiero_unitario = 10  # Riesgo moderado
-        elif costo_por_beneficiario <= 5000:
-            riesgo_financiero_unitario = 5   # Riesgo medio-alto
-        else:
-            riesgo_financiero_unitario = 2   # Alto riesgo
-
-        # Riesgo por presupuesto total (proyectos muy grandes tienen más riesgo)
-        if presupuesto_total <= 500_000_000:  # Hasta 500M
-            riesgo_financiero_total = 15  # Bajo riesgo
-        elif presupuesto_total <= 2_000_000_000:  # Hasta 2B
-            riesgo_financiero_total = 12  # Riesgo moderado
-        elif presupuesto_total <= 5_000_000_000:  # Hasta 5B
-            riesgo_financiero_total = 8   # Riesgo medio
-        else:
-            riesgo_financiero_total = 5   # Alto riesgo
-
-        riesgo_total += riesgo_financiero_unitario + riesgo_financiero_total
-
-        # 2. Riesgo de sostenibilidad temporal (25 puntos)
-        # Proyectos muy largos tienen mayor riesgo de cambios de contexto
-        duracion_años = proyecto.duracion_años
-
-        if duracion_años <= 1:
-            riesgo_temporal = 25  # Bajo riesgo
-        elif duracion_años <= 2:
-            riesgo_temporal = 20  # Riesgo moderado
-        elif duracion_años <= 3:
-            riesgo_temporal = 15  # Riesgo medio
-        else:
-            riesgo_temporal = 10  # Alto riesgo (cambios de gobierno, etc.)
-
-        riesgo_total += riesgo_temporal
-
-        # 3. Riesgo de complejidad geográfica (25 puntos)
-        # Más departamentos/municipios = mayor complejidad operativa
-        num_departamentos = len(proyecto.departamentos)
-        area = proyecto.area_geografica.value
-
-        if area == "municipal":
-            riesgo_geografico = 25  # Bajo riesgo (focalizado)
-        elif area == "departamental" and num_departamentos == 1:
-            riesgo_geografico = 20  # Riesgo moderado
-        elif area == "regional" or num_departamentos <= 3:
-            riesgo_geografico = 15  # Riesgo medio
-        else:  # nacional o muchos departamentos
-            riesgo_geografico = 10  # Alto riesgo (coordinación compleja)
-
-        riesgo_total += riesgo_geografico
-
-        # 4. Riesgo operativo y social (20 puntos)
-        # Basado en ratio beneficiarios vs presupuesto (eficiencia)
-        beneficiarios_totales = proyecto.beneficiarios_totales
-
-        # Proyectos con muy pocos beneficiarios tienen mayor riesgo de justificación
-        if beneficiarios_totales >= 5000:
-            riesgo_operativo = 10  # Bajo riesgo
-        elif beneficiarios_totales >= 1000:
-            riesgo_operativo = 7   # Riesgo moderado
-        elif beneficiarios_totales >= 500:
-            riesgo_operativo = 5   # Riesgo medio
-        else:
-            riesgo_operativo = 3   # Alto riesgo
-
-        # Riesgo por poblaciones difíciles de alcanzar
-        poblaciones_complejas = [
-            "desplazados", "víctimas", "rural dispersa", "difícil acceso",
-            "conflicto", "vulnerable extrema"
-        ]
-        poblacion_lower = proyecto.poblacion_objetivo.lower()
-        tiene_poblacion_compleja = any(pop in poblacion_lower for pop in poblaciones_complejas)
-
-        if tiene_poblacion_compleja:
-            riesgo_social = 5   # Mayor riesgo de ejecución
-        else:
-            riesgo_social = 10  # Menor riesgo
-
-        riesgo_total += riesgo_operativo + riesgo_social
-
-        # Penalizaciones adicionales por riesgos específicos
-
-        # Riesgo regulatorio: proyectos muy complejos en alcance
-        if num_departamentos >= 10 and presupuesto_total >= 5_000_000_000:
-            riesgo_total *= 0.9  # 10% penalización por alta complejidad regulatoria
-
-        # Riesgo tecnológico implícito en poblaciones rurales
-        if "rural" in poblacion_lower or "dispersa" in poblacion_lower:
-            riesgo_total *= 0.95  # 5% penalización por desafíos tecnológicos
-
-        # INTEGRACIÓN DE CAMPOS CUALITATIVOS
-        # Ajuste por Nivel de Riesgos (evaluación cualitativa)
-        nivel_riesgos = proyecto.indicadores_impacto.get('nivel_riesgos', 'Medios y manejables')
-        if nivel_riesgos == 'Bajos y manejables':
-            riesgo_total *= 1.25  # 25% mejora (score más alto = riesgo más bajo)
-        elif nivel_riesgos == 'Medios y manejables':
-            riesgo_total *= 1.08  # 8% mejora
-        elif nivel_riesgos == 'Altos pero mitigables':
-            riesgo_total *= 0.85  # 15% penalización
-        elif nivel_riesgos == 'Altos y complejos':
-            riesgo_total *= 0.70  # 30% penalización por riesgos muy altos
-
-        return min(max(riesgo_total, 0), 100)
-
-    @staticmethod
-    def score_a_nivel_riesgo(score: float) -> str:
-        """
-        Convierte un score numérico a nivel de riesgo.
+        Evalúa riesgos del proyecto y retorna score 0-100 (inverso).
 
         Args:
-            score: Score de 0-100
+            proyecto: Proyecto a evaluar
 
         Returns:
-            Nivel de riesgo como string ("bajo", "medio", "alto")
+            Score 0-100 (más riesgo = menos puntos)
+
+        Raises:
+            ValueError: Si faltan datos requeridos
         """
-        if score >= 75:
-            return "bajo"
-        elif score >= 60:
-            return "medio"
-        else:
-            return "alto"
+        # Validar datos
+        validacion = proyecto.validar_riesgos()
+        if not validacion['valido']:
+            raise ValueError(f"Datos riesgos inválidos: {validacion['mensaje']}")
 
-    def evaluar_con_nivel(self, proyecto: ProyectoSocial) -> tuple[float, str]:
-        """
-        Evalúa el proyecto y retorna tanto el score como el nivel de riesgo.
-
-        Returns:
-            Tupla (score, nivel) donde nivel es "bajo", "medio" o "alto"
-        """
-        score = self.evaluar(proyecto)
-        nivel = self.score_a_nivel_riesgo(score)
-        return score, nivel
-
-    def get_nombre(self) -> str:
-        return "Evaluación de Riesgos"
-
-    def get_descripcion(self) -> str:
-        return (
-            "Evalúa los riesgos tecnológicos, regulatorios, financieros, sociales "
-            "y operativos asociados a la ejecución del proyecto. Considera "
-            "complejidad presupuestaria, duración, alcance geográfico y "
-            "características de la población objetivo. Score alto = bajo riesgo."
+        # Calcular componentes
+        score_tecnico = self._calcular_riesgo_individual(
+            proyecto.riesgo_tecnico_probabilidad,
+            proyecto.riesgo_tecnico_impacto
         )
 
-    def get_detalles_evaluacion(self, proyecto: ProyectoSocial) -> dict:
+        score_social = self._calcular_riesgo_individual(
+            proyecto.riesgo_social_probabilidad,
+            proyecto.riesgo_social_impacto
+        )
+
+        score_financiero = self._calcular_riesgo_individual(
+            proyecto.riesgo_financiero_probabilidad,
+            proyecto.riesgo_financiero_impacto
+        )
+
+        score_regulatorio = self._calcular_riesgo_individual(
+            proyecto.riesgo_regulatorio_probabilidad,
+            proyecto.riesgo_regulatorio_impacto
+        )
+
+        score_automaticos = self._calcular_factores_automaticos(proyecto)
+
+        # Score total ponderado
+        score = (
+            score_tecnico * self.PESO_TECNICO +
+            score_social * self.PESO_SOCIAL +
+            score_financiero * self.PESO_FINANCIERO +
+            score_regulatorio * self.PESO_REGULATORIO +
+            score_automaticos * self.PESO_AUTOMATICOS
+        )
+
+        return score
+
+    def evaluar_detallado(self, proyecto: ProyectoSocial) -> ResultadoRiesgos:
         """
-        Retorna detalles de la evaluación para debugging y análisis.
+        Evaluación detallada con metadata y alertas.
+
+        Args:
+            proyecto: Proyecto a evaluar
 
         Returns:
-            Diccionario con métricas clave
+            ResultadoRiesgos con detalles completos
         """
-        score, nivel_riesgo = self.evaluar_con_nivel(proyecto)
+        # Validar
+        validacion = proyecto.validar_riesgos()
+        alertas = validacion.get('advertencias', [])
+        recomendaciones = []
 
-        poblaciones_complejas = [
-            "desplazados", "víctimas", "rural dispersa", "difícil acceso",
-            "conflicto", "vulnerable extrema"
-        ]
-        poblacion_lower = proyecto.poblacion_objetivo.lower()
-        tiene_poblacion_compleja = any(pop in poblacion_lower for pop in poblaciones_complejas)
+        # Calcular niveles de riesgo
+        nivel_tecnico = self._calcular_nivel_riesgo(
+            proyecto.riesgo_tecnico_probabilidad,
+            proyecto.riesgo_tecnico_impacto
+        )
 
-        # Identificar riesgos específicos
-        riesgos_identificados = []
+        nivel_social = self._calcular_nivel_riesgo(
+            proyecto.riesgo_social_probabilidad,
+            proyecto.riesgo_social_impacto
+        )
 
-        if proyecto.presupuesto_total > 5_000_000_000:
-            riesgos_identificados.append("Financiero: Presupuesto muy alto")
+        nivel_financiero = self._calcular_nivel_riesgo(
+            proyecto.riesgo_financiero_probabilidad,
+            proyecto.riesgo_financiero_impacto
+        )
 
-        if proyecto.duracion_años > 3:
-            riesgos_identificados.append("Temporal: Duración extendida")
+        nivel_regulatorio = self._calcular_nivel_riesgo(
+            proyecto.riesgo_regulatorio_probabilidad,
+            proyecto.riesgo_regulatorio_impacto
+        )
 
-        if len(proyecto.departamentos) >= 5:
-            riesgos_identificados.append("Geográfico: Múltiples departamentos")
+        # Calcular scores (inversos)
+        score_tecnico = self._nivel_a_score_inverso(nivel_tecnico)
+        score_social = self._nivel_a_score_inverso(nivel_social)
+        score_financiero = self._nivel_a_score_inverso(nivel_financiero)
+        score_regulatorio = self._nivel_a_score_inverso(nivel_regulatorio)
+        score_automaticos = self._calcular_factores_automaticos(proyecto)
 
-        if proyecto.beneficiarios_totales < 500:
-            riesgos_identificados.append("Operativo: Pocos beneficiarios")
+        # Contribuciones
+        contrib_tecnico = score_tecnico * self.PESO_TECNICO
+        contrib_social = score_social * self.PESO_SOCIAL
+        contrib_financiero = score_financiero * self.PESO_FINANCIERO
+        contrib_regulatorio = score_regulatorio * self.PESO_REGULATORIO
+        contrib_automaticos = score_automaticos * self.PESO_AUTOMATICOS
 
-        if tiene_poblacion_compleja:
-            riesgos_identificados.append("Social: Población de difícil acceso")
+        # Score total
+        score = (
+            contrib_tecnico +
+            contrib_social +
+            contrib_financiero +
+            contrib_regulatorio +
+            contrib_automaticos
+        )
 
-        if proyecto.costo_por_beneficiario > 5000:
-            riesgos_identificados.append("Financiero: Alto costo unitario")
+        # Generar alertas por riesgos críticos
+        if nivel_tecnico >= 20:
+            alertas.append(
+                f"🚨 Riesgo Técnico CRÍTICO (nivel {nivel_tecnico}): "
+                f"Requiere plan de mitigación robusto"
+            )
+        elif nivel_tecnico >= 13:
+            alertas.append(
+                f"⚠️  Riesgo Técnico ALTO (nivel {nivel_tecnico}): "
+                f"Evaluar alternativas técnicas"
+            )
 
-        return {
-            'nivel_riesgo': nivel_riesgo,
-            'score_seguridad': score,
-            'costo_por_beneficiario': proyecto.presupuesto_por_beneficiario,
-            'presupuesto_total': proyecto.presupuesto_total,
-            'duracion_años': proyecto.duracion_años,
-            'num_departamentos': len(proyecto.departamentos),
-            'area_geografica': proyecto.area_geografica.value,
-            'beneficiarios_totales': proyecto.beneficiarios_totales,
-            'poblacion_objetivo': proyecto.poblacion_objetivo,
-            'tiene_poblacion_compleja': tiene_poblacion_compleja,
-            'riesgos_identificados': riesgos_identificados if riesgos_identificados else ["Ninguno crítico"],
-            'recomendacion': 'Aprobación segura' if score >= 75 else
-                           'Requiere análisis adicional' if score >= 60 else
-                           'Requiere mitigación de riesgos'
-        }
+        if nivel_social >= 20:
+            alertas.append(
+                f"🚨 Riesgo Social CRÍTICO (nivel {nivel_social}): "
+                f"Alto riesgo de conflicto comunitario"
+            )
+        elif nivel_social >= 13:
+            alertas.append(
+                f"⚠️  Riesgo Social ALTO (nivel {nivel_social}): "
+                f"Fortalecer estrategia de relacionamiento"
+            )
+
+        if nivel_financiero >= 20:
+            alertas.append(
+                f"🚨 Riesgo Financiero CRÍTICO (nivel {nivel_financiero}): "
+                f"Revisar viabilidad presupuestaria"
+            )
+
+        if nivel_regulatorio >= 20:
+            alertas.append(
+                f"🚨 Riesgo Regulatorio CRÍTICO (nivel {nivel_regulatorio}): "
+                f"Marco legal muy incierto"
+            )
+
+        # Recomendaciones
+        if score < 40:
+            recomendaciones.append(
+                "⚠️  Perfil de riesgo ALTO: Proyecto requiere análisis detallado "
+                "de viabilidad y planes robustos de mitigación"
+            )
+        elif score < 60:
+            recomendaciones.append(
+                "💡 Perfil de riesgo MEDIO: Desarrollar planes de mitigación "
+                "para riesgos identificados"
+            )
+
+        if any(n >= 20 for n in [nivel_tecnico, nivel_social, nivel_financiero, nivel_regulatorio]):
+            recomendaciones.append(
+                "🔴 Uno o más riesgos CRÍTICOS: Considerar si proyecto es viable "
+                "o requiere rediseño fundamental"
+            )
+
+        # Determinar nivel general
+        nivel_general = self._determinar_nivel_general(
+            [nivel_tecnico, nivel_social, nivel_financiero, nivel_regulatorio]
+        )
+
+        # Mensaje
+        if score >= 80:
+            mensaje = "Perfil de riesgo BAJO - Proyecto con alta viabilidad"
+        elif score >= 60:
+            mensaje = "Perfil de riesgo MEDIO - Riesgos manejables"
+        elif score >= 40:
+            mensaje = "Perfil de riesgo ALTO - Requiere mitigación significativa"
+        else:
+            mensaje = "Perfil de riesgo CRÍTICO - Viabilidad cuestionable"
+
+        return ResultadoRiesgos(
+            score=score,
+            nivel_riesgo_tecnico=nivel_tecnico,
+            nivel_riesgo_social=nivel_social,
+            nivel_riesgo_financiero=nivel_financiero,
+            nivel_riesgo_regulatorio=nivel_regulatorio,
+            score_riesgo_tecnico=score_tecnico,
+            score_riesgo_social=score_social,
+            score_riesgo_financiero=score_financiero,
+            score_riesgo_regulatorio=score_regulatorio,
+            score_factores_automaticos=score_automaticos,
+            contribucion_tecnico=contrib_tecnico,
+            contribucion_social=contrib_social,
+            contribucion_financiero=contrib_financiero,
+            contribucion_regulatorio=contrib_regulatorio,
+            contribucion_automaticos=contrib_automaticos,
+            nivel_general=nivel_general,
+            mensaje=mensaje,
+            alertas=alertas,
+            recomendaciones=recomendaciones
+        )
+
+    def _calcular_nivel_riesgo(self, probabilidad: int, impacto: int) -> int:
+        """
+        Calcula nivel de riesgo: Probabilidad × Impacto
+
+        Returns:
+            Nivel de riesgo 1-25
+        """
+        return probabilidad * impacto
+
+    def _nivel_a_score_inverso(self, nivel: int) -> float:
+        """
+        Convierte nivel de riesgo a score inverso.
+
+        Score = 100 - (nivel / 25 × 100)
+
+        Args:
+            nivel: Nivel de riesgo (1-25)
+
+        Returns:
+            Score 0-100 (inverso: más riesgo = menos puntos)
+        """
+        score = 100 - (nivel / 25 * 100)
+        return max(min(score, 100), 0)
+
+    def _calcular_riesgo_individual(self, probabilidad: Optional[int], impacto: Optional[int]) -> float:
+        """Calcula score de un riesgo individual"""
+        if probabilidad is None or impacto is None:
+            return 70.0  # Neutro si no especificado
+
+        nivel = self._calcular_nivel_riesgo(probabilidad, impacto)
+        return self._nivel_a_score_inverso(nivel)
+
+    def _calcular_factores_automaticos(self, proyecto: ProyectoSocial) -> float:
+        """
+        Calcula score de factores automáticos de riesgo.
+
+        Penalizaciones automáticas basadas en características del proyecto.
+        """
+        score = 100.0
+
+        # Penalización por presupuesto alto
+        if proyecto.presupuesto_total:
+            if proyecto.presupuesto_total > 1_000_000_000:
+                score -= 15
+            elif proyecto.presupuesto_total > 500_000_000:
+                score -= 10
+
+        # Penalización por duración larga
+        if proyecto.duracion_estimada_meses:
+            if proyecto.duracion_estimada_meses > 24:
+                score -= 10
+            elif proyecto.duracion_estimada_meses > 12:
+                score -= 5
+
+        # Penalización por múltiples departamentos
+        if proyecto.departamentos and len(proyecto.departamentos) > 2:
+            score -= 5
+
+        # Penalización por población vulnerable
+        if (hasattr(proyecto, 'stakeholders_involucrados') and
+            proyecto.stakeholders_involucrados and
+            'comunidades_indigenas' in proyecto.stakeholders_involucrados):
+            score -= 5  # Mayor complejidad cultural/legal
+
+        # Penalización por municipio NO-PDET (potencialmente menos apoyo)
+        if hasattr(proyecto, 'tiene_municipios_pdet') and not proyecto.tiene_municipios_pdet:
+            # Solo si está en zona que podría tener conflictos
+            if proyecto.departamentos:
+                departamentos_conflicto = ['CHOCÓ', 'CAUCA', 'NARIÑO', 'PUTUMAYO', 'CAQUETÁ']
+                if any(d in departamentos_conflicto for d in proyecto.departamentos):
+                    score -= 10
+
+        return max(score, 0)
+
+    def _determinar_nivel_general(self, niveles: List[int]) -> str:
+        """
+        Determina nivel general de riesgo basado en todos los niveles.
+
+        Usa el nivel más alto (más conservador)
+        """
+        max_nivel = max(niveles) if niveles else 0
+
+        if max_nivel >= 20:
+            return "CRÍTICO"
+        elif max_nivel >= 13:
+            return "ALTO"
+        elif max_nivel >= 6:
+            return "MEDIO"
+        else:
+            return "BAJO"
+
+    def aplicar_peso(self, score: float) -> float:
+        """
+        Aplica el peso del criterio (15%) al score.
+
+        Args:
+            score: Score base 0-100
+
+        Returns:
+            Contribución al score final (0-15)
+        """
+        return score * self.peso

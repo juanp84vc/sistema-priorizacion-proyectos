@@ -27,6 +27,7 @@ from src.models.proyecto import ProyectoSocial
 from src.criterios.sroi import SROICriterio, ResultadoSROI
 from src.criterios.probabilidad_aprobacion_pdet import ProbabilidadAprobacionCriterio
 from src.criterios.stakeholders import StakeholdersCriterio
+from src.criterios.riesgos import RiesgosCriterio
 
 
 @dataclass
@@ -98,9 +99,7 @@ class MotorScoringArquitecturaC:
             db_path=db_path
         )
         self.criterio_stakeholders = StakeholdersCriterio(peso=self.PESO_STAKEHOLDERS)
-
-        # TODO: Criterio pendiente
-        # self.criterio_riesgos = RiesgosCriterio(peso=self.PESO_RIESGOS)
+        self.criterio_riesgos = RiesgosCriterio(peso=self.PESO_RIESGOS)
 
     def calcular_score(
         self,
@@ -172,10 +171,13 @@ class MotorScoringArquitecturaC:
             contribucion_probabilidad = 0
 
         # ========== CRITERIO 4: RIESGOS (15%) ==========
-        # TODO: Usar criterio existente temporalmente
-        # Por ahora usar cálculo simplificado
-        score_riesgos = self._calcular_riesgos_temporal(proyecto)
-        contribucion_riesgos = score_riesgos * self.PESO_RIESGOS
+        try:
+            score_riesgos = self.criterio_riesgos.evaluar(proyecto)
+            contribucion_riesgos = score_riesgos * self.PESO_RIESGOS
+        except ValueError as e:
+            alertas.append(f"⚠️  Error Riesgos: {e}")
+            score_riesgos = 0
+            contribucion_riesgos = 0
 
         # ========== SCORE TOTAL ==========
         score_total = (
@@ -221,16 +223,6 @@ class MotorScoringArquitecturaC:
             recomendaciones=recomendaciones,
             resultado_sroi_detallado=resultado_sroi
         )
-
-    def _calcular_riesgos_temporal(self, proyecto: ProyectoSocial) -> float:
-        """
-        Cálculo temporal de riesgos
-        TODO: Reemplazar con RiesgosCriterio real
-
-        Por ahora retorna score neutro
-        """
-        # Score neutro por defecto
-        return 70.0
 
     def _determinar_nivel_prioridad(
         self,
