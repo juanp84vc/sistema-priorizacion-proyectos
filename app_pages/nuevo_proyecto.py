@@ -52,7 +52,17 @@ def limpiar_session_state():
         'datos_basicos',
         'criterios',
         'ultimo_resultado',
-        'ultimo_proyecto'
+        'ultimo_proyecto',
+        # Campos del formulario
+        'form_nombre',
+        'form_organizacion',
+        'form_presupuesto',
+        'form_beneficiarios_directos',
+        'form_beneficiarios_indirectos',
+        'form_duracion',
+        'form_descripcion',
+        'form_departamento',
+        'form_municipio'
     ]
     for key in keys_to_delete:
         if key in st.session_state:
@@ -71,170 +81,227 @@ def formatear_numero(numero: float, decimales: int = 2) -> str:
 # ============================================================================
 
 def seccion_datos_basicos() -> Optional[Dict]:
-    """Sección de datos básicos del proyecto"""
+    """Sección de datos básicos del proyecto - SIN FORM para permitir reactividad"""
 
     repo_pdet = get_pdet_repository()
 
     st.subheader("📋 Información General")
 
-    st.markdown("""
-    Complete los datos básicos del proyecto. Los campos marcados con * son obligatorios.
-    """)
+    st.markdown("Complete los datos básicos del proyecto. Los campos marcados con * son obligatorios.")
 
-    with st.form("form_datos_basicos"):
-        col1, col2 = st.columns(2)
+    # Inicializar session_state si no existe
+    if 'form_nombre' not in st.session_state:
+        st.session_state.form_nombre = ""
+    if 'form_organizacion' not in st.session_state:
+        st.session_state.form_organizacion = "ENLAZA GEB"
+    if 'form_presupuesto' not in st.session_state:
+        st.session_state.form_presupuesto = 500_000_000
+    if 'form_beneficiarios_directos' not in st.session_state:
+        st.session_state.form_beneficiarios_directos = 1000
+    if 'form_beneficiarios_indirectos' not in st.session_state:
+        st.session_state.form_beneficiarios_indirectos = 4000
+    if 'form_duracion' not in st.session_state:
+        st.session_state.form_duracion = 12
+    if 'form_descripcion' not in st.session_state:
+        st.session_state.form_descripcion = ""
+    if 'form_departamento' not in st.session_state:
+        st.session_state.form_departamento = "Seleccionar..."
+    if 'form_municipio' not in st.session_state:
+        st.session_state.form_municipio = "Seleccionar..."
 
-        with col1:
-            nombre = st.text_input(
-                "Nombre del Proyecto *",
-                placeholder="Ej: Acueducto Rural Abejorral",
-                help="Nombre descriptivo del proyecto"
-            )
+    # Campos básicos
+    col1, col2 = st.columns(2)
 
-            organizacion = st.text_input(
-                "Organización Ejecutora *",
-                value="ENLAZA GEB",
-                help="Entidad responsable de ejecutar el proyecto"
-            )
-
-            presupuesto = st.number_input(
-                "Presupuesto Total (COP) *",
-                min_value=0,
-                value=500_000_000,
-                step=10_000_000,
-                format="%d",
-                help="Presupuesto total en pesos colombianos"
-            )
-
-        with col2:
-            beneficiarios_directos = st.number_input(
-                "Beneficiarios Directos *",
-                min_value=0,
-                value=1000,
-                step=100,
-                help="Número de personas directamente beneficiadas"
-            )
-
-            beneficiarios_indirectos = st.number_input(
-                "Beneficiarios Indirectos",
-                min_value=0,
-                value=4000,
-                step=100,
-                help="Número de personas indirectamente beneficiadas"
-            )
-
-            duracion = st.number_input(
-                "Duración Estimada (meses) *",
-                min_value=1,
-                max_value=60,
-                value=12,
-                help="Tiempo estimado de ejecución"
-            )
-
-        descripcion = st.text_area(
-            "Descripción del Proyecto",
-            placeholder="Describa brevemente el proyecto, sus objetivos y alcance...",
-            height=100
+    with col1:
+        nombre = st.text_input(
+            "Nombre del Proyecto *",
+            value=st.session_state.form_nombre,
+            placeholder="Ej: Alcantarillado Rural Abejorral",
+            help="Nombre descriptivo del proyecto",
+            key="input_nombre"
         )
+        st.session_state.form_nombre = nombre
 
-        st.markdown("---")
-        st.markdown("### 📍 Ubicación Geográfica")
-
-        # Obtener departamentos disponibles
-        departamentos_disponibles = repo_pdet.get_departamentos()
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            departamento = st.selectbox(
-                "Departamento *",
-                options=["Seleccionar..."] + sorted(departamentos_disponibles),
-                help="Departamento donde se ejecutará el proyecto"
-            )
-
-        with col2:
-            if departamento and departamento != "Seleccionar...":
-                # Obtener municipios del departamento
-                municipios_dpto = repo_pdet.get_municipios_por_departamento(departamento)
-
-                municipio = st.selectbox(
-                    "Municipio *",
-                    options=["Seleccionar..."] + sorted(municipios_dpto),
-                    help="Municipio donde se ejecutará el proyecto"
-                )
-            else:
-                municipio = st.selectbox(
-                    "Municipio *",
-                    options=["Primero seleccione departamento"],
-                    disabled=True
-                )
-                municipio = None
-
-        # Detectar automáticamente si es PDET
-        es_pdet = False
-        puntajes_sectores = {}
-
-        if municipio and municipio != "Seleccionar...":
-            es_pdet = repo_pdet.es_municipio_pdet(municipio, departamento)
-
-            if es_pdet:
-                st.success(f"✅ **{municipio}** es municipio PDET - Elegible para Obras por Impuestos")
-                puntajes_sectores = repo_pdet.get_puntajes_sectores(municipio, departamento)
-
-                # Mostrar puntajes disponibles
-                if puntajes_sectores:
-                    st.caption(f"📊 Sectores disponibles: {', '.join(puntajes_sectores.keys())}")
-            else:
-                st.warning(f"⚠️ **{municipio}** NO es municipio PDET")
-                st.caption("Score Probabilidad de Aprobación = 0")
-
-        submitted = st.form_submit_button(
-            "✅ Continuar a Criterios de Evaluación",
-            type="primary",
-            use_container_width=True
+        organizacion = st.text_input(
+            "Organización Ejecutora *",
+            value=st.session_state.form_organizacion,
+            help="Entidad responsable de ejecutar el proyecto",
+            key="input_organizacion"
         )
+        st.session_state.form_organizacion = organizacion
 
-        if submitted:
-            # Validaciones
+        presupuesto = st.number_input(
+            "Presupuesto Total ($) *",
+            min_value=0,
+            value=st.session_state.form_presupuesto,
+            step=10_000_000,
+            format="%d",
+            help="Presupuesto total en pesos colombianos",
+            key="input_presupuesto"
+        )
+        st.session_state.form_presupuesto = presupuesto
+
+    with col2:
+        beneficiarios_directos = st.number_input(
+            "Beneficiarios Directos *",
+            min_value=0,
+            value=st.session_state.form_beneficiarios_directos,
+            step=100,
+            help="Número de personas directamente beneficiadas",
+            key="input_beneficiarios_directos"
+        )
+        st.session_state.form_beneficiarios_directos = beneficiarios_directos
+
+        beneficiarios_indirectos = st.number_input(
+            "Beneficiarios Indirectos",
+            min_value=0,
+            value=st.session_state.form_beneficiarios_indirectos,
+            step=100,
+            help="Número de personas indirectamente beneficiadas",
+            key="input_beneficiarios_indirectos"
+        )
+        st.session_state.form_beneficiarios_indirectos = beneficiarios_indirectos
+
+        duracion = st.number_input(
+            "Duración Estimada (meses) *",
+            min_value=1,
+            max_value=60,
+            value=st.session_state.form_duracion,
+            help="Tiempo estimado de ejecución del proyecto",
+            key="input_duracion"
+        )
+        st.session_state.form_duracion = duracion
+
+    descripcion = st.text_area(
+        "Descripción del Proyecto",
+        value=st.session_state.form_descripcion,
+        placeholder="Describa brevemente el proyecto, sus objetivos y alcance...",
+        height=100,
+        key="input_descripcion"
+    )
+    st.session_state.form_descripcion = descripcion
+
+    st.markdown("---")
+    st.subheader("📍 Ubicación")
+
+    # Obtener lista de departamentos únicos
+    departamentos_disponibles = repo_pdet.get_departamentos()
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Calcular índice para el selector
+        try:
+            if st.session_state.form_departamento in departamentos_disponibles:
+                dept_index = sorted(departamentos_disponibles).index(st.session_state.form_departamento) + 1
+            else:
+                dept_index = 0
+        except:
+            dept_index = 0
+
+        departamento = st.selectbox(
+            "Departamento *",
+            options=["Seleccionar..."] + sorted(departamentos_disponibles),
+            index=dept_index,
+            help="Departamento donde se ejecutará el proyecto",
+            key="input_departamento"
+        )
+        st.session_state.form_departamento = departamento
+
+    with col2:
+        # CLAVE: Ahora SÍ funciona porque NO está dentro de form
+        if departamento and departamento != "Seleccionar...":
+            # Obtener municipios del departamento seleccionado
+            municipios_dpto = repo_pdet.get_municipios_por_departamento(departamento)
+
+            municipio = st.selectbox(
+                "Municipio *",
+                options=["Seleccionar..."] + sorted(municipios_dpto),
+                help="Municipio donde se ejecutará el proyecto",
+                key="input_municipio"
+            )
+            st.session_state.form_municipio = municipio
+        else:
+            st.selectbox(
+                "Municipio *",
+                options=["Primero seleccione departamento"],
+                disabled=True,
+                key="input_municipio_disabled"
+            )
+            municipio = "Seleccionar..."
+            st.session_state.form_municipio = municipio
+
+    # Detectar automáticamente si es PDET
+    es_pdet = False
+    puntajes_sectores = {}
+
+    if municipio and municipio != "Seleccionar...":
+        es_pdet = repo_pdet.es_municipio_pdet(municipio, departamento)
+
+        if es_pdet:
+            st.success(f"✅ **{municipio}** es municipio PDET - Elegible para Obras por Impuestos")
+            puntajes_sectores = repo_pdet.get_puntajes_sectores(municipio, departamento)
+
+            # Mostrar sectores disponibles
+            if puntajes_sectores:
+                with st.expander("📋 Ver puntajes sectoriales PDET"):
+                    sectores_ordenados = sorted(
+                        puntajes_sectores.items(),
+                        key=lambda x: x[1],
+                        reverse=True
+                    )
+                    for sector, puntaje in sectores_ordenados:
+                        st.write(f"- **{sector.title()}:** {puntaje}/10 {'⭐' * (puntaje // 2)}")
+        else:
+            st.warning(f"⚠️ **{municipio}** NO es municipio PDET")
+            st.caption("Score Probabilidad de Aprobación = 0")
+
+    st.markdown("---")
+
+    # Botón para continuar (fuera de form)
+    col1, col2, col3 = st.columns([2, 1, 2])
+
+    with col2:
+        if st.button("✅ Continuar a Criterios", type="primary", use_container_width=True):
+            # Validar campos requeridos
             errores = []
 
-            if not nombre:
+            if not nombre or nombre.strip() == "":
                 errores.append("El nombre del proyecto es requerido")
-            if not organizacion:
+            if not organizacion or organizacion.strip() == "":
                 errores.append("La organización es requerida")
             if presupuesto <= 0:
                 errores.append("El presupuesto debe ser mayor a 0")
             if beneficiarios_directos <= 0:
                 errores.append("Los beneficiarios directos deben ser mayor a 0")
-            if not departamento or departamento == "Seleccionar...":
+            if departamento == "Seleccionar...":
                 errores.append("Debe seleccionar un departamento")
-            if not municipio or municipio == "Seleccionar...":
+            if municipio == "Seleccionar...":
                 errores.append("Debe seleccionar un municipio")
 
             if errores:
                 for error in errores:
                     st.error(f"❌ {error}")
-                return None
+            else:
+                # Guardar en session_state
+                st.session_state.datos_basicos = {
+                    'nombre': nombre,
+                    'organizacion': organizacion,
+                    'descripcion': descripcion,
+                    'presupuesto': presupuesto,
+                    'beneficiarios_directos': beneficiarios_directos,
+                    'beneficiarios_indirectos': beneficiarios_indirectos,
+                    'duracion': duracion,
+                    'departamento': departamento,
+                    'municipio': municipio,
+                    'es_pdet': es_pdet,
+                    'puntajes_sectores': puntajes_sectores
+                }
 
-            # Guardar en session_state
-            st.session_state.datos_basicos = {
-                'nombre': nombre,
-                'organizacion': organizacion,
-                'descripcion': descripcion,
-                'presupuesto': presupuesto,
-                'beneficiarios_directos': beneficiarios_directos,
-                'beneficiarios_indirectos': beneficiarios_indirectos,
-                'duracion': duracion,
-                'departamento': departamento,
-                'municipio': municipio,
-                'es_pdet': es_pdet,
-                'puntajes_sectores': puntajes_sectores
-            }
+                st.success("✅ Datos básicos guardados. Continúe a la pestaña 'Criterios de Evaluación'")
+                st.balloons()
 
-            st.success("✅ Datos básicos guardados. Continúe a la pestaña 'Criterios de Evaluación'")
-            st.rerun()
-
-    # Retornar datos si ya están guardados
+    # Retornar datos si ya están en session_state
     return st.session_state.get('datos_basicos', None)
 
 
