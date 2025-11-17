@@ -16,7 +16,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Importar páginas
-from app_pages import home, nuevo_proyecto, buscar_proyectos, evaluar_cartera, dashboard, configuracion, historial_proyecto, asistente_ia, historial_ia
+from app_pages import home, nuevo_proyecto, buscar_proyectos, evaluar_cartera, dashboard, configuracion, historial_proyecto, asistente_ia, historial_ia, test_motor
 
 # Importar gestor de base de datos
 from database.db_manager import get_db_manager
@@ -113,7 +113,7 @@ with st.sidebar:
     menu_option = st.radio(
         "Selecciona una opción:",
         ["🏠 Inicio", "➕ Nuevo Proyecto", "🔍 Buscar y Editar",
-         "📊 Evaluar Cartera", "📚 Historial", "🤖 Asistente IA",
+         "📊 Evaluar Cartera", "🧪 Test Motor", "📚 Historial", "🤖 Asistente IA",
          "📖 Historial IA", "📈 Dashboard", "⚙️ Configuración"],
         label_visibility="collapsed"
     )
@@ -134,6 +134,8 @@ elif menu_option == "🔍 Buscar y Editar":
     buscar_proyectos.show()
 elif menu_option == "📊 Evaluar Cartera":
     evaluar_cartera.show()
+elif menu_option == "🧪 Test Motor":
+    test_motor.show()
 elif menu_option == "📚 Historial":
     historial_proyecto.show()
 elif menu_option == "🤖 Asistente IA":

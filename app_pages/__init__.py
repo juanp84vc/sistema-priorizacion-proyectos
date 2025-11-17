@@ -8,5 +8,6 @@ from app_pages import configuracion
 from app_pages import historial_proyecto
 from app_pages import asistente_ia
 from app_pages import historial_ia
+from app_pages import test_motor
 
-__all__ = ['home', 'nuevo_proyecto', 'buscar_proyectos', 'evaluar_cartera', 'dashboard', 'configuracion', 'historial_proyecto', 'asistente_ia', 'historial_ia']
+__all__ = ['home', 'nuevo_proyecto', 'buscar_proyectos', 'evaluar_cartera', 'dashboard', 'configuracion', 'historial_proyecto', 'asistente_ia', 'historial_ia', 'test_motor']
