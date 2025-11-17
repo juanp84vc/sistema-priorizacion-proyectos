@@ -1,14 +1,18 @@
-"""Criterios de evaluación de proyectos"""
-from .base import CriterioEvaluacion
-from .costo_efectividad import CostoEfectividadCriterio
-from .stakeholders import StakeholdersCriterio
-from .probabilidad_aprobacion import ProbabilidadAprobacionCriterio
-from .riesgos import RiesgosCriterio
+"""
+Módulo de criterios de evaluación para Arquitectura C
+"""
+
+from .sroi import SROICriterio, ResultadoSROI
+from .probabilidad_aprobacion_pdet import ProbabilidadAprobacionCriterio
+from .stakeholders import StakeholdersCriterio, ResultadoStakeholders
+from .riesgos import RiesgosCriterio, ResultadoRiesgos
 
 __all__ = [
-    'CriterioEvaluacion',
-    'CostoEfectividadCriterio',
-    'StakeholdersCriterio',
+    'SROICriterio',
+    'ResultadoSROI',
     'ProbabilidadAprobacionCriterio',
-    'RiesgosCriterio'
+    'StakeholdersCriterio',
+    'ResultadoStakeholders',
+    'RiesgosCriterio',
+    'ResultadoRiesgos',
 ]
