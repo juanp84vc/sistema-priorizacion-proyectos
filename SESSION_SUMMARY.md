@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Priorización de Proyectos Sociales
 **Arquitectura:** Arquitectura C (Aprobada 15 Nov 2025)
-**Progreso:** 2/4 criterios (50%)
+**Progreso:** 3/4 criterios (75%)
 
 ---
 
@@ -13,7 +13,7 @@
 ```
 Score Final del Proyecto =
     SROI × 40% +                      ← ✅ COMPLETADO (16 Nov)
-    Stakeholders × 25% +              ← ⏳ PENDIENTE
+    Stakeholders × 25% +              ← ✅ COMPLETADO (17 Nov)
     Probabilidad Aprobación × 20% +   ← ✅ COMPLETADO (15 Nov)
     Riesgos × 15%                     ← ⏳ PENDIENTE
 ```
@@ -866,3 +866,314 @@ Sistema: FUNCIONANDO EN PRODUCCIÓN
 
 **Fecha de cierre:** 16 Noviembre 2025, 21:00
 **Calidad:** Production-ready, validado con datos reales
+
+---
+
+## SESIÓN 6: 17 NOVIEMBRE 2025
+
+### Implementación: Criterio Stakeholders (25%) - Arquitectura C
+
+**Objetivo:** Implementar criterio completo de Stakeholders con enfoque estratégico ENLAZA.
+
+### Contexto ENLAZA
+
+**Doble Propósito:**
+1. **Mejorar relacionamiento** con autoridades locales y comunidades
+2. **Habilitar operaciones** de ENLAZA (licencia social para operar)
+
+**Realidad operacional:**
+- ENLAZA construye líneas de transmisión eléctrica
+- Necesita licencia social de comunidades
+- Obras por Impuestos = Herramienta estratégica
+- Proyectos facilitan operaciones de transmisión
+- Relacionamiento fuerte = Operaciones viables
+
+### Logros
+
+#### 1. Modelo de Datos Actualizado
+
+**Archivo:** `src/models/proyecto.py`
+
+Nuevos campos agregados:
+```python
+# Pertinencia Operacional/Reputacional (1-5)
+pertinencia_operacional: Optional[int] = None
+# 5=Muy Alta, 4=Alta, 3=Media, 2=Baja, 1=Nula
+
+# Mejora del Relacionamiento (1-5)
+mejora_relacionamiento: Optional[int] = None
+# 5=Sustancial, 4=Confianza, 3=Moderada, 2=Limitada, 1=No aporta
+
+# Stakeholders involucrados (lista)
+stakeholders_involucrados: List[str] = field(default_factory=list)
+# 'autoridades_locales', 'lideres_comunitarios', 'comunidades_indigenas',
+# 'organizaciones_sociales', 'sector_privado', 'academia', 'medios_comunicacion'
+
+# Corredor de transmisión (boolean)
+en_corredor_transmision: bool = False
+
+# Observaciones stakeholders (opcional)
+observaciones_stakeholders: str = ""  # Max 1000 caracteres
+```
+
+Método de validación:
+```python
+def validar_stakeholders() -> Dict[str, Any]:
+    # Valida campos requeridos
+    # Retorna errores y advertencias
+    # Sugiere documentar contexto para casos críticos
+```
+
+#### 2. Clase StakeholdersCriterio
+
+**Archivo:** `src/criterios/stakeholders.py` (329 líneas, reemplazado completamente)
+
+**Componentes del criterio (pesos):**
+
+1. **Pertinencia Operacional/Reputacional (40%)**
+   - Escala 1-5 → Scores: 20, 40, 65, 85, 100
+   - Evalúa criticidad para operaciones ENLAZA
+   - Muy Alta (5): Proyecto crítico, operaciones en riesgo
+   - Nula (1): Sin pertinencia operacional
+
+2. **Mejora del Relacionamiento (35%)**
+   - Escala 1-5 → Scores: 20, 40, 65, 85, 100
+   - Evalúa impacto en relaciones con stakeholders
+   - Sustancial (5): Transforma relación completamente
+   - No Aporta (1): Sin efecto perceptible
+
+3. **Alcance Territorial (15%)**
+   - Cálculo automático:
+     - Base: Número municipios × 10 [máx 60]
+     - +20 si PDET
+     - +15 si múltiples departamentos
+     - +10 si corredor transmisión
+   - Normalizado a 0-100
+
+4. **Tipo de Stakeholders Involucrados (10%)**
+   - Autoridades locales: 25 pts
+   - Comunidades indígenas: 25 pts
+   - Líderes comunitarios: 20 pts
+   - Organizaciones sociales: 15 pts
+   - Sector privado: 10 pts
+   - Academia: 10 pts
+   - Medios comunicación: 5 pts
+   - Total máximo: 110 pts → normalizado a 100
+
+**Características:**
+```python
+class StakeholdersCriterio:
+    PESO_PERTINENCIA = 0.40
+    PESO_RELACIONAMIENTO = 0.35
+    PESO_ALCANCE = 0.15
+    PESO_STAKEHOLDERS_TIPO = 0.10
+
+    def evaluar(proyecto) -> float  # 0-100
+    def evaluar_detallado(proyecto) -> ResultadoStakeholders
+    def aplicar_peso(score) -> float  # × 0.25
+```
+
+**ResultadoStakeholders:**
+- Scores por componente (4)
+- Contribuciones ponderadas (4)
+- Nivel: MUY ALTO, ALTO, MEDIO, BAJO
+- Alertas contextuales
+- Recomendaciones estratégicas
+
+#### 3. Tests Comprehensivos
+
+**Archivo:** `tests/test_stakeholders.py` (700 líneas)
+
+**30 tests passing (100%):**
+
+1. **Pertinencia Operacional (5 tests)**
+   - Muy Alta → 100
+   - Alta → 85
+   - Media → 65
+   - Baja → 40
+   - Nula → 20
+
+2. **Mejora Relacionamiento (5 tests)**
+   - Sustancial → 100
+   - Confianza → 85
+   - Moderada → 65
+   - Limitada → 40
+   - No Aporta → 20
+
+3. **Alcance Territorial (5 tests)**
+   - 1 municipio base
+   - Bonus PDET (+20)
+   - Múltiples municipios
+   - Múltiples departamentos (+15)
+   - Corredor transmisión (+10)
+
+4. **Stakeholders Tipo (3 tests)**
+   - Sin stakeholders → 50 (neutro)
+   - Autoridades + indígenas → ~45
+   - Todos → 100
+
+5. **Ponderación (4 tests)**
+   - Pesos suman 100%
+   - Proyecto estratégico alto score
+   - Proyecto marginal bajo score
+   - Aplicación peso 25%
+
+6. **Validación (2 tests)**
+   - Error sin pertinencia
+   - Error sin relacionamiento
+
+7. **Alertas y Niveles (6 tests)**
+   - Alertas pertinencia MUY ALTA
+   - Recomendaciones estratégicas
+   - Niveles correctos
+
+#### 4. Integración en Motor
+
+**Archivo:** `src/scoring/motor_arquitectura_c.py`
+
+Cambios:
+- ✅ Import StakeholdersCriterio
+- ✅ Instanciación del criterio (peso 0.25)
+- ✅ Integrado en `calcular_score()`
+- ✅ Eliminado método temporal `_calcular_stakeholders_temporal()`
+
+```python
+# CRITERIO 2: STAKEHOLDERS (25%)
+try:
+    score_stakeholders = self.criterio_stakeholders.evaluar(proyecto)
+    contribucion_stakeholders = score_stakeholders * 0.25
+except ValueError as e:
+    alertas.append(f"⚠️  Error Stakeholders: {e}")
+    score_stakeholders = 0
+    contribucion_stakeholders = 0
+```
+
+**Tests motor actualizados:**
+- Agregados campos stakeholders a proyectos de prueba
+- 80 tests totales passing ✅
+
+#### 5. Documentación Completa
+
+**Archivo:** `IMPLEMENTACION_STAKEHOLDERS_25.md` (900+ líneas)
+
+Contenido:
+- ✅ Resumen ejecutivo con contexto ENLAZA
+- ✅ Componentes del criterio detallados
+- ✅ Tablas de escalas y puntajes
+- ✅ Ejemplos de uso (3 casos completos)
+- ✅ Implementación técnica
+- ✅ Guía de integración
+- ✅ Tests documentados
+- ✅ Impacto en el sistema
+- ✅ Comparaciones antes/después
+
+### Ejemplos de Scoring
+
+**Proyecto Estratégico:**
+```
+Pertinencia: 5 (MUY ALTA) → 100 × 0.40 = 40.0
+Relacionamiento: 5 (SUSTANCIAL) → 100 × 0.35 = 35.0
+Alcance: 3 municipios PDET + corredor → 47.6 × 0.15 = 7.1
+Stakeholders: Autoridades + indígenas + líderes → 63.6 × 0.10 = 6.4
+────────────────────────────────────────────────────────────
+TOTAL: 88.5/100 (MUY ALTO)
+```
+
+**Proyecto Marginal:**
+```
+Pertinencia: 1 (NULA) → 20 × 0.40 = 8.0
+Relacionamiento: 2 (LIMITADA) → 40 × 0.35 = 14.0
+Alcance: 1 municipio NO-PDET → 9.5 × 0.15 = 1.4
+Stakeholders: Ninguno → 50 × 0.10 = 5.0
+────────────────────────────────────────────────────────────
+TOTAL: 28.4/100 (BAJO)
+```
+
+### Impacto en Sistema
+
+**Antes (Temporal):**
+- Lógica simplificada basada en beneficiarios
+- Score genérico 50-95
+- Sin consideración estratégica
+
+**Ahora (Arquitectura C):**
+- Evaluación en 4 dimensiones
+- Enfoque estratégico ENLAZA
+- Diferenciación clara 0-100
+- Alineación operacional
+
+**Diferencial de scoring:**
+- Proyecto estratégico: +40 puntos vs temporal
+- Proyecto marginal: -30 puntos vs temporal
+- Mayor precision y fairness
+
+### Archivos Creados/Modificados
+
+**Modificados:**
+1. `src/models/proyecto.py` - Campos + validación stakeholders
+2. `src/criterios/__init__.py` - Import actualizado
+3. `src/scoring/motor_arquitectura_c.py` - Integración real
+4. `tests/test_motor_arquitectura_c.py` - Datos stakeholders
+
+**Creados:**
+1. `src/criterios/stakeholders.py` (reemplazado completamente)
+2. `tests/test_stakeholders.py` (30 tests)
+3. `IMPLEMENTACION_STAKEHOLDERS_25.md` (documentación)
+
+**Actualizados:**
+1. `SESSION_SUMMARY.md` - Esta sección
+
+### Resultados Finales
+
+**Tests totales:** 80 passing (100%)
+- 15 tests Probabilidad PDET
+- 28 tests SROI
+- 30 tests Stakeholders
+- 7 tests Motor Arquitectura C
+
+**Líneas de código:**
+- stakeholders.py: 329 líneas
+- test_stakeholders.py: 700 líneas
+- documentación: 900+ líneas
+
+**Tiempo invertido:** ~3 horas
+
+### Estado Arquitectura C Actualizado
+
+```
+Score = SROI×40% + Stakeholders×25% + Prob.Aprob×20% + Riesgos×15%
+
+✅ SROI (40%):              COMPLETADO - 28 tests
+✅ Stakeholders (25%):      COMPLETADO - 30 tests
+✅ Prob. Aprobación (20%):  COMPLETADO - 15 tests
+⏳ Riesgos (15%):           PENDIENTE
+
+Progreso: 75% completo (3/4 criterios)
+Sistema: 80 tests passing
+```
+
+### Próximos Pasos
+
+**Criterio Riesgos (15%):**
+- Último criterio pendiente
+- Diseño + implementación
+- Mínimo 20 tests
+- Integración en motor
+
+**Después de Riesgos:**
+- Sistema 100% Arquitectura C
+- Validación completa E2E
+- Interfaz captura datos
+- Producción completa
+
+### Conclusiones
+
+1. **Alineación Estratégica:** Criterio refleja necesidades reales de ENLAZA
+2. **Granularidad:** 4 dimensiones permiten evaluación precisa
+3. **Transparencia:** Cada score justificado y auditable
+4. **Calidad:** 30 tests garantizan robustez
+5. **Producción:** Sistema listo para stakeholders
+
+**Arquitectura C:** 75% completado (3/4 criterios)
+
+---

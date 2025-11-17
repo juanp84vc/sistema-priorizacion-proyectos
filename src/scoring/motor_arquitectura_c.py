@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.models.proyecto import ProyectoSocial
 from src.criterios.sroi import SROICriterio, ResultadoSROI
 from src.criterios.probabilidad_aprobacion_pdet import ProbabilidadAprobacionCriterio
+from src.criterios.stakeholders import StakeholdersCriterio
 
 
 @dataclass
@@ -90,15 +91,15 @@ class MotorScoringArquitecturaC:
         Args:
             db_path: Ruta a la base de datos con matriz PDET
         """
-        # Criterios nuevos (implementados)
+        # Criterios implementados
         self.criterio_sroi = SROICriterio(peso=self.PESO_SROI)
         self.criterio_probabilidad = ProbabilidadAprobacionCriterio(
             peso=self.PESO_PROBABILIDAD,
             db_path=db_path
         )
+        self.criterio_stakeholders = StakeholdersCriterio(peso=self.PESO_STAKEHOLDERS)
 
-        # TODO: Criterios existentes (usar temporalmente hasta reimplementar)
-        # self.criterio_stakeholders = StakeholdersCriterio(peso=self.PESO_STAKEHOLDERS)
+        # TODO: Criterio pendiente
         # self.criterio_riesgos = RiesgosCriterio(peso=self.PESO_RIESGOS)
 
     def calcular_score(
@@ -142,10 +143,13 @@ class MotorScoringArquitecturaC:
             resultado_sroi = None
 
         # ========== CRITERIO 2: STAKEHOLDERS (25%) ==========
-        # TODO: Usar criterio existente temporalmente
-        # Por ahora usar cálculo simplificado basado en número de beneficiarios
-        score_stakeholders = self._calcular_stakeholders_temporal(proyecto)
-        contribucion_stakeholders = score_stakeholders * self.PESO_STAKEHOLDERS
+        try:
+            score_stakeholders = self.criterio_stakeholders.evaluar(proyecto)
+            contribucion_stakeholders = score_stakeholders * self.PESO_STAKEHOLDERS
+        except ValueError as e:
+            alertas.append(f"⚠️  Error Stakeholders: {e}")
+            score_stakeholders = 0
+            contribucion_stakeholders = 0
 
         # ========== CRITERIO 3: PROBABILIDAD APROBACIÓN (20%) ==========
         try:
@@ -217,26 +221,6 @@ class MotorScoringArquitecturaC:
             recomendaciones=recomendaciones,
             resultado_sroi_detallado=resultado_sroi
         )
-
-    def _calcular_stakeholders_temporal(self, proyecto: ProyectoSocial) -> float:
-        """
-        Cálculo temporal de stakeholders
-        TODO: Reemplazar con StakeholdersCriterio real
-
-        Lógica simplificada basada en número de beneficiarios
-        """
-        beneficiarios = proyecto.beneficiarios_totales
-
-        if beneficiarios >= 10000:
-            return 95.0
-        elif beneficiarios >= 5000:
-            return 85.0
-        elif beneficiarios >= 1000:
-            return 70.0
-        elif beneficiarios >= 500:
-            return 60.0
-        else:
-            return 50.0
 
     def _calcular_riesgos_temporal(self, proyecto: ProyectoSocial) -> float:
         """

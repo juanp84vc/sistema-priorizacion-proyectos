@@ -54,12 +54,17 @@ class TestMotorScoringArquitecturaC(unittest.TestCase):
             sectores=["Alcantarillado"],
             tiene_municipios_pdet=True,
             puntajes_pdet={"Alcantarillado": 10},
-            puntaje_sectorial_max=10
+            puntaje_sectorial_max=10,
+            # Stakeholders fields
+            pertinencia_operacional=5,
+            mejora_relacionamiento=5,
+            en_corredor_transmision=True,
+            stakeholders_involucrados=['autoridades_locales', 'comunidades_indigenas', 'lideres_comunitarios']
         )
 
         resultado = self.motor.calcular_score(proyecto)
 
-        # Score debe ser muy alto
+        # Score debe ser muy alto (ahora con stakeholders reales)
         self.assertGreater(resultado.score_total, 85)
         self.assertIn(resultado.nivel_prioridad, ["ALTA", "MUY ALTA"])
 

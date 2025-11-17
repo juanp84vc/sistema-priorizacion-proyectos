@@ -1,161 +1,328 @@
 """
-Criterio de Contribución al Relacionamiento con Stakeholders.
-Evalúa la contribución del proyecto al relacionamiento con stakeholders locales
-y a la viabilidad de las operaciones y proyectos de GEB.
+Criterio de evaluación: Stakeholders (Relacionamiento y Pertinencia Operacional)
+Arquitectura C - Peso: 25%
+
+Este criterio evalúa:
+1. Pertinencia operacional/reputacional para ENLAZA (40%)
+2. Mejora del relacionamiento con stakeholders (35%)
+3. Alcance territorial del proyecto (15%)
+4. Tipo de stakeholders involucrados (10%)
+
+Contexto ENLAZA:
+- Proyectos como herramientas para licencia social
+- Facilitar operaciones de líneas de transmisión
+- Mejorar relacionamiento en territorios estratégicos
 """
-from criterios.base import CriterioEvaluacion
-from models.proyecto import ProyectoSocial
+
+from dataclasses import dataclass
+from typing import List, Dict, Any, Optional
+from src.models.proyecto import ProyectoSocial
 
 
-class ContribucionStakeholdersCriterio(CriterioEvaluacion):
+# Mapeos de escalas a scores
+ESCALA_PERTINENCIA = {
+    5: 100,  # Muy Alta - Crítico para operaciones
+    4: 85,   # Alta - Importante para operaciones
+    3: 65,   # Media - Útil para operaciones
+    2: 40,   # Baja - Marginal para operaciones
+    1: 20    # Nula - Sin pertinencia operacional
+}
+
+ESCALA_RELACIONAMIENTO = {
+    5: 100,  # Mejora Sustancial - Transforma relación
+    4: 85,   # Genera Confianza - Mejora significativa
+    3: 65,   # Contribución Moderada - Mejora positiva
+    2: 40,   # Impacto Limitado - Mejora menor
+    1: 20    # No Aporta - Sin efecto perceptible
+}
+
+# Puntajes para stakeholders
+PUNTAJES_STAKEHOLDERS = {
+    'autoridades_locales': 25,
+    'lideres_comunitarios': 20,
+    'comunidades_indigenas': 25,
+    'organizaciones_sociales': 15,
+    'sector_privado': 10,
+    'academia': 10,
+    'medios_comunicacion': 5
+}
+
+PUNTAJE_MAXIMO_STAKEHOLDERS = 110  # Suma de todos
+
+
+@dataclass
+class ResultadoStakeholders:
+    """Resultado detallado de evaluación Stakeholders"""
+    score: float  # 0-100
+
+    # Scores por componente
+    score_pertinencia: float
+    score_relacionamiento: float
+    score_alcance: float
+    score_stakeholders_tipo: float
+
+    # Contribuciones al score final
+    contribucion_pertinencia: float
+    contribucion_relacionamiento: float
+    contribucion_alcance: float
+    contribucion_stakeholders: float
+
+    # Metadata
+    nivel: str  # "MUY ALTO", "ALTO", "MEDIO", "BAJO"
+    mensaje: str
+    alertas: List[str]
+    recomendaciones: List[str]
+
+
+class StakeholdersCriterio:
     """
-    Evalúa la contribución del proyecto al relacionamiento con stakeholders
-    locales y a la viabilidad de las operaciones.
+    Evalúa contribución al relacionamiento con stakeholders
+    y pertinencia operacional para ENLAZA.
 
-    Considera:
-    - Nivel de involucramiento de comunidades locales
-    - Fortalecimiento de relaciones institucionales
-    - Apoyo a viabilidad operativa de proyectos de GEB
-    - Cobertura geográfica estratégica
+    Criterio: 25% del score total (Arquitectura C)
+
+    Componentes:
+    - Pertinencia Operacional (40%)
+    - Mejora Relacionamiento (35%)
+    - Alcance Territorial (15%)
+    - Stakeholders Involucrados (10%)
     """
 
-    def __init__(
-        self,
-        peso: float = 0.25,
-        bonus_area_nacional: float = 1.15,
-        bonus_multiples_departamentos: float = 1.1
-    ):
-        """
-        Args:
-            peso: Peso del criterio en la evaluación total
-            bonus_area_nacional: Multiplicador para proyectos de alcance nacional
-            bonus_multiples_departamentos: Multiplicador para proyectos multi-departamentales
-        """
-        super().__init__(peso)
-        self.bonus_nacional = bonus_area_nacional
-        self.bonus_multi_depto = bonus_multiples_departamentos
+    # Pesos de componentes
+    PESO_PERTINENCIA = 0.40
+    PESO_RELACIONAMIENTO = 0.35
+    PESO_ALCANCE = 0.15
+    PESO_STAKEHOLDERS_TIPO = 0.10
+
+    def __init__(self, peso: float = 0.25):
+        self.peso = peso
+        self.nombre = "Stakeholders (Relacionamiento y Pertinencia Operacional)"
+        self.descripcion = "Evalúa relacionamiento con stakeholders y pertinencia operacional"
 
     def evaluar(self, proyecto: ProyectoSocial) -> float:
         """
-        Evalúa la contribución a stakeholders del proyecto.
+        Evalúa stakeholders del proyecto y retorna score 0-100.
 
-        Metodología:
-        1. Score base por alcance geográfico (nacional > regional > local)
-        2. Bonus por múltiples departamentos (mayor relacionamiento)
-        3. Bonus por alta cobertura de beneficiarios
-        4. Evaluación de sostenibilidad como proxy de viabilidad
-        5. Normaliza a escala 0-100
+        Args:
+            proyecto: Proyecto a evaluar
 
         Returns:
-            Score de 0-100 (100 = máxima contribución a stakeholders)
+            Score 0-100
+
+        Raises:
+            ValueError: Si faltan datos requeridos
+        """
+        # Validar datos
+        validacion = proyecto.validar_stakeholders()
+        if not validacion['valido']:
+            raise ValueError(f"Datos stakeholders inválidos: {validacion['mensaje']}")
+
+        # Calcular componentes
+        score_pertinencia = self._calcular_pertinencia(proyecto)
+        score_relacionamiento = self._calcular_relacionamiento(proyecto)
+        score_alcance = self._calcular_alcance_territorial(proyecto)
+        score_stakeholders = self._calcular_stakeholders_tipo(proyecto)
+
+        # Score total ponderado
+        score = (
+            score_pertinencia * self.PESO_PERTINENCIA +
+            score_relacionamiento * self.PESO_RELACIONAMIENTO +
+            score_alcance * self.PESO_ALCANCE +
+            score_stakeholders * self.PESO_STAKEHOLDERS_TIPO
+        )
+
+        return score
+
+    def evaluar_detallado(self, proyecto: ProyectoSocial) -> ResultadoStakeholders:
+        """
+        Evaluación detallada con metadata y alertas.
+
+        Args:
+            proyecto: Proyecto a evaluar
+
+        Returns:
+            ResultadoStakeholders con detalles completos
+        """
+        # Validar
+        validacion = proyecto.validar_stakeholders()
+        alertas = validacion.get('advertencias', [])
+        recomendaciones = []
+
+        # Calcular componentes
+        score_pertinencia = self._calcular_pertinencia(proyecto)
+        score_relacionamiento = self._calcular_relacionamiento(proyecto)
+        score_alcance = self._calcular_alcance_territorial(proyecto)
+        score_stakeholders = self._calcular_stakeholders_tipo(proyecto)
+
+        # Contribuciones
+        contrib_pertinencia = score_pertinencia * self.PESO_PERTINENCIA
+        contrib_relacionamiento = score_relacionamiento * self.PESO_RELACIONAMIENTO
+        contrib_alcance = score_alcance * self.PESO_ALCANCE
+        contrib_stakeholders = score_stakeholders * self.PESO_STAKEHOLDERS_TIPO
+
+        # Score total
+        score = (
+            contrib_pertinencia +
+            contrib_relacionamiento +
+            contrib_alcance +
+            contrib_stakeholders
+        )
+
+        # Generar alertas y recomendaciones
+        if proyecto.pertinencia_operacional == 5:
+            alertas.append(
+                "⭐ Pertinencia MUY ALTA: Proyecto crítico para operaciones ENLAZA"
+            )
+
+        if proyecto.mejora_relacionamiento == 5:
+            alertas.append(
+                "⭐ Mejora SUSTANCIAL: Proyecto transforma relacionamiento"
+            )
+
+        if proyecto.pertinencia_operacional >= 4 and proyecto.mejora_relacionamiento >= 4:
+            recomendaciones.append(
+                "💡 Proyecto altamente estratégico: Priorizar en portafolio"
+            )
+
+        if score < 50:
+            recomendaciones.append(
+                "⚠️  Score bajo en Stakeholders: Revisar pertinencia estratégica"
+            )
+
+        if not proyecto.stakeholders_involucrados:
+            recomendaciones.append(
+                "📋 Especificar stakeholders para evaluación más precisa"
+            )
+
+        # Determinar nivel
+        nivel = self._determinar_nivel(score)
+
+        # Mensaje
+        if score >= 80:
+            mensaje = "Excelente contribución a relacionamiento y operaciones"
+        elif score >= 60:
+            mensaje = "Buena contribución a relacionamiento"
+        elif score >= 40:
+            mensaje = "Contribución moderada a relacionamiento"
+        else:
+            mensaje = "Contribución limitada a relacionamiento"
+
+        return ResultadoStakeholders(
+            score=score,
+            score_pertinencia=score_pertinencia,
+            score_relacionamiento=score_relacionamiento,
+            score_alcance=score_alcance,
+            score_stakeholders_tipo=score_stakeholders,
+            contribucion_pertinencia=contrib_pertinencia,
+            contribucion_relacionamiento=contrib_relacionamiento,
+            contribucion_alcance=contrib_alcance,
+            contribucion_stakeholders=contrib_stakeholders,
+            nivel=nivel,
+            mensaje=mensaje,
+            alertas=alertas,
+            recomendaciones=recomendaciones
+        )
+
+    def _calcular_pertinencia(self, proyecto: ProyectoSocial) -> float:
+        """
+        Calcula score de pertinencia operacional/reputacional (40%)
+
+        Escala 1-5 → Score según mapeo ESCALA_PERTINENCIA
+        """
+        pertinencia = proyecto.pertinencia_operacional
+
+        if pertinencia is None:
+            return 50.0  # Neutro si no especificado
+
+        return float(ESCALA_PERTINENCIA.get(pertinencia, 50))
+
+    def _calcular_relacionamiento(self, proyecto: ProyectoSocial) -> float:
+        """
+        Calcula score de mejora del relacionamiento (35%)
+
+        Escala 1-5 → Score según mapeo ESCALA_RELACIONAMIENTO
+        """
+        relacionamiento = proyecto.mejora_relacionamiento
+
+        if relacionamiento is None:
+            return 50.0  # Neutro si no especificado
+
+        return float(ESCALA_RELACIONAMIENTO.get(relacionamiento, 50))
+
+    def _calcular_alcance_territorial(self, proyecto: ProyectoSocial) -> float:
+        """
+        Calcula score de alcance territorial (15%)
+
+        Basado en:
+        - Número de municipios
+        - Bonus si PDET
+        - Bonus si múltiples departamentos
+        - Bonus si corredor transmisión
         """
         score = 0
 
-        # 1. Score base según área geográfica (40 puntos)
-        if proyecto.area_geografica.value == "nacional":
-            score += 40  # Máximo impacto en relacionamiento
-        elif proyecto.area_geografica.value == "regional":
-            score += 30  # Alto impacto regional
-        elif proyecto.area_geografica.value == "departamental":
-            score += 25  # Buen impacto departamental
-        else:  # municipal
-            score += 20  # Impacto local focalizado
+        # Base: número de municipios (10 pts c/u, max 60)
+        num_municipios = len(proyecto.municipios) if proyecto.municipios else 1
+        score_base = min(num_municipios * 10, 60)
+        score += score_base
 
-        # 2. Bonus por múltiples departamentos (20 puntos)
-        num_departamentos = len(proyecto.departamentos)
-        if num_departamentos >= 5:
-            score += 20  # Múltiples stakeholders departamentales
-        elif num_departamentos >= 3:
-            score += 15
-        elif num_departamentos >= 2:
-            score += 10
-        else:
-            score += 5
-
-        # 3. Evaluación por cobertura de beneficiarios (20 puntos)
-        # Más beneficiarios = mayor relacionamiento con comunidades
-        total_beneficiarios = proyecto.beneficiarios_totales
-        if total_beneficiarios >= 10000:
-            score += 20  # Amplia cobertura comunitaria
-        elif total_beneficiarios >= 5000:
-            score += 15
-        elif total_beneficiarios >= 1000:
-            score += 10
-        else:
-            score += 5
-
-        # 4. Viabilidad operativa basada en sostenibilidad (20 puntos)
-        # Proyectos con buena planificación financiera apoyan viabilidad
-        costo_por_beneficiario = proyecto.presupuesto_por_beneficiario
-        if costo_por_beneficiario <= 1000:  # Eficiente
+        # Bonus PDET: +20 pts
+        if proyecto.tiene_municipios_pdet:
             score += 20
-        elif costo_por_beneficiario <= 3000:  # Razonable
+
+        # Bonus múltiples departamentos: +15 pts
+        num_departamentos = len(proyecto.departamentos) if proyecto.departamentos else 1
+        if num_departamentos > 1:
             score += 15
-        elif costo_por_beneficiario <= 5000:  # Aceptable
+
+        # Bonus corredor transmisión: +10 pts
+        if proyecto.en_corredor_transmision:
             score += 10
-        else:  # Alto riesgo de viabilidad
-            score += 5
 
-        # Bonus por alcance nacional o multi-departamental
-        if proyecto.area_geografica.value == "nacional":
-            score *= self.bonus_nacional
-        elif num_departamentos >= 3:
-            score *= self.bonus_multi_depto
+        # Normalizar a 0-100
+        # Máximo posible: 60 + 20 + 15 + 10 = 105
+        score_normalizado = min((score / 105) * 100, 100)
 
-        # Bonus adicional por proyectos con poblaciones objetivo vulnerables
-        # (mayor impacto en relacionamiento social)
-        poblaciones_prioritarias = [
-            "niños", "mujeres", "adultos mayores", "discapacidad",
-            "desplazados", "víctimas", "indígenas", "afrocolombianos"
-        ]
-        poblacion_lower = proyecto.poblacion_objetivo.lower()
-        if any(pop in poblacion_lower for pop in poblaciones_prioritarias):
-            score *= 1.05  # 5% bonus por población vulnerable
+        return score_normalizado
 
-        # INTEGRACIÓN DE CAMPOS CUALITATIVOS
-        # Ajuste por Nivel de Contribución al Relacionamiento (cualitativo)
-        contribucion = proyecto.indicadores_impacto.get('contribucion_stakeholders', 'Moderada')
-        if contribucion == 'Alta':
-            score *= 1.20  # 20% bonus por alta contribución explícita
-        elif contribucion == 'Baja':
-            score *= 0.80  # 20% penalización por baja contribución
-
-        return min(max(score, 0), 100)
-
-    def get_nombre(self) -> str:
-        return "Contribución al Relacionamiento con Stakeholders"
-
-    def get_descripcion(self) -> str:
-        return (
-            "Evalúa la contribución del proyecto al relacionamiento con stakeholders "
-            "locales (comunidades, autoridades, instituciones) y a la viabilidad de "
-            "las operaciones y proyectos de GEB. Considera alcance geográfico, "
-            "cobertura de beneficiarios y sostenibilidad operativa."
-        )
-
-    def get_detalles_evaluacion(self, proyecto: ProyectoSocial) -> dict:
+    def _calcular_stakeholders_tipo(self, proyecto: ProyectoSocial) -> float:
         """
-        Retorna detalles de la evaluación para debugging y análisis.
+        Calcula score de stakeholders involucrados (10%)
+
+        Basado en tipos de stakeholders seleccionados
+        """
+        if not proyecto.stakeholders_involucrados:
+            return 50.0  # Neutro si no especificados
+
+        # Sumar puntajes de stakeholders seleccionados
+        puntaje_total = 0
+        for stakeholder in proyecto.stakeholders_involucrados:
+            puntaje_total += PUNTAJES_STAKEHOLDERS.get(stakeholder, 0)
+
+        # Normalizar a 0-100
+        score = (puntaje_total / PUNTAJE_MAXIMO_STAKEHOLDERS) * 100
+
+        return min(score, 100)
+
+    def _determinar_nivel(self, score: float) -> str:
+        """Determina nivel de prioridad basado en score"""
+        if score >= 85:
+            return "MUY ALTO"
+        elif score >= 70:
+            return "ALTO"
+        elif score >= 50:
+            return "MEDIO"
+        else:
+            return "BAJO"
+
+    def aplicar_peso(self, score: float) -> float:
+        """
+        Aplica el peso del criterio (25%) al score.
+
+        Args:
+            score: Score base 0-100
 
         Returns:
-            Diccionario con métricas clave
+            Contribución al score final (0-25)
         """
-        poblaciones_prioritarias = [
-            "niños", "mujeres", "adultos mayores", "discapacidad",
-            "desplazados", "víctimas", "indígenas", "afrocolombianos"
-        ]
-        poblacion_lower = proyecto.poblacion_objetivo.lower()
-        tiene_poblacion_vulnerable = any(pop in poblacion_lower for pop in poblaciones_prioritarias)
-
-        return {
-            'area_geografica': proyecto.area_geografica.value,
-            'num_departamentos': len(proyecto.departamentos),
-            'departamentos': proyecto.departamentos,
-            'beneficiarios_totales': proyecto.beneficiarios_totales,
-            'costo_por_beneficiario': proyecto.presupuesto_por_beneficiario,
-            'poblacion_objetivo': proyecto.poblacion_objetivo,
-            'tiene_poblacion_vulnerable': tiene_poblacion_vulnerable,
-            'nivel_relacionamiento': 'Alto' if len(proyecto.departamentos) >= 3 else
-                                   'Medio' if len(proyecto.departamentos) >= 2 else
-                                   'Básico'
-        }
+        return score * self.peso

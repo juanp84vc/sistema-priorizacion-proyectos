@@ -74,6 +74,29 @@ class ProyectoSocial:
     fecha_calculo_sroi: Optional[str] = None
     metodologia_sroi: Optional[str] = None  # "Estándar", "Simplificada", "Preliminar"
 
+    # ========== NUEVOS: Criterio Stakeholders - Arquitectura C ==========
+
+    # Pertinencia Operacional/Reputacional (1-5)
+    pertinencia_operacional: Optional[int] = None
+    # 5=Muy Alta, 4=Alta, 3=Media, 2=Baja, 1=Nula
+
+    # Mejora del Relacionamiento (1-5)
+    mejora_relacionamiento: Optional[int] = None
+    # 5=Sustancial, 4=Confianza, 3=Moderada, 2=Limitada, 1=No aporta
+
+    # Stakeholders involucrados (lista de strings)
+    stakeholders_involucrados: List[str] = field(default_factory=list)
+    # Opciones: 'autoridades_locales', 'lideres_comunitarios',
+    #           'comunidades_indigenas', 'organizaciones_sociales',
+    #           'sector_privado', 'academia', 'medios_comunicacion'
+
+    # Corredor de transmisión (boolean)
+    en_corredor_transmision: bool = False
+
+    # Observaciones stakeholders (opcional)
+    observaciones_stakeholders: str = ""
+    # Max 1000 caracteres, para explicar contexto específico
+
     # Metadata
     fecha_presentacion: str = ""
     contacto_organizacion: str = ""
@@ -164,3 +187,48 @@ class ProyectoSocial:
                 'nivel': 'BAJA',
                 'requiere_observaciones': False
             }
+
+    def validar_stakeholders(self) -> Dict[str, Any]:
+        """
+        Valida datos del criterio Stakeholders
+
+        Returns:
+            Dict con 'valido', 'mensaje', 'errores', 'advertencias'
+        """
+        errores = []
+        advertencias = []
+
+        # Validar pertinencia operacional
+        if self.pertinencia_operacional is None:
+            errores.append("Pertinencia operacional no definida")
+        elif self.pertinencia_operacional not in [1, 2, 3, 4, 5]:
+            errores.append(f"Pertinencia operacional inválida: {self.pertinencia_operacional}")
+
+        # Validar mejora relacionamiento
+        if self.mejora_relacionamiento is None:
+            errores.append("Mejora relacionamiento no definida")
+        elif self.mejora_relacionamiento not in [1, 2, 3, 4, 5]:
+            errores.append(f"Mejora relacionamiento inválida: {self.mejora_relacionamiento}")
+
+        # Advertencias
+        if self.pertinencia_operacional == 5 and not self.observaciones_stakeholders:
+            advertencias.append(
+                "Pertinencia MUY ALTA: Recomendar documentar contexto operacional"
+            )
+
+        if self.mejora_relacionamiento == 5 and not self.observaciones_stakeholders:
+            advertencias.append(
+                "Mejora SUSTANCIAL: Recomendar documentar estrategia de relacionamiento"
+            )
+
+        if not self.stakeholders_involucrados:
+            advertencias.append(
+                "Sin stakeholders especificados: Considerar agregar para evaluación completa"
+            )
+
+        return {
+            'valido': len(errores) == 0,
+            'errores': errores,
+            'advertencias': advertencias,
+            'mensaje': errores[0] if errores else "Validación exitosa"
+        }
