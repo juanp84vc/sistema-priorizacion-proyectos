@@ -262,7 +262,7 @@ class DatabaseManager:
                     duracion_estimada_meses
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                          ?, ?, ?, ?)
+                          ?, ?, ?, ?, ?)
             """, (
                 # Campos básicos
                 data['id'], data['nombre'], data['organizacion'], data['descripcion'],
