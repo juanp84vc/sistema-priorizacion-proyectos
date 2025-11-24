@@ -95,7 +95,8 @@ class DatabaseManager:
         Returns:
             Diccionario con los datos del proyecto
         """
-        return {
+        data = {
+            # Campos básicos
             'id': proyecto.id,
             'nombre': proyecto.nombre,
             'organizacion': proyecto.organizacion,
@@ -112,8 +113,42 @@ class DatabaseManager:
             'estado': proyecto.estado.value,
             'indicadores_impacto': json.dumps(proyecto.indicadores_impacto),
             'fecha_creacion': datetime.now().isoformat(),
-            'fecha_modificacion': datetime.now().isoformat()
+            'fecha_modificacion': datetime.now().isoformat(),
         }
+
+        # Campos Arquitectura C - PDET/Probabilidad
+        data['sectores'] = json.dumps(getattr(proyecto, 'sectores', []))
+        data['puntajes_pdet'] = json.dumps(getattr(proyecto, 'puntajes_pdet', {}))
+        data['tiene_municipios_pdet'] = 1 if getattr(proyecto, 'tiene_municipios_pdet', False) else 0
+        data['puntaje_sectorial_max'] = getattr(proyecto, 'puntaje_sectorial_max', 0) or 0
+
+        # Campos SROI adicionales
+        data['observaciones_sroi'] = getattr(proyecto, 'observaciones_sroi', '') or ''
+        data['nivel_confianza_sroi'] = getattr(proyecto, 'nivel_confianza_sroi', '') or ''
+        data['fecha_calculo_sroi'] = getattr(proyecto, 'fecha_calculo_sroi', '') or ''
+        data['metodologia_sroi'] = getattr(proyecto, 'metodologia_sroi', '') or ''
+
+        # Campos Stakeholders
+        data['pertinencia_operacional'] = getattr(proyecto, 'pertinencia_operacional', 3)
+        data['mejora_relacionamiento'] = getattr(proyecto, 'mejora_relacionamiento', 3)
+        data['stakeholders_involucrados'] = json.dumps(getattr(proyecto, 'stakeholders_involucrados', []))
+        data['en_corredor_transmision'] = 1 if getattr(proyecto, 'en_corredor_transmision', False) else 0
+        data['observaciones_stakeholders'] = getattr(proyecto, 'observaciones_stakeholders', '') or ''
+
+        # Campos Riesgos
+        data['riesgo_tecnico_probabilidad'] = getattr(proyecto, 'riesgo_tecnico_probabilidad', 2)
+        data['riesgo_tecnico_impacto'] = getattr(proyecto, 'riesgo_tecnico_impacto', 2)
+        data['riesgo_social_probabilidad'] = getattr(proyecto, 'riesgo_social_probabilidad', 2)
+        data['riesgo_social_impacto'] = getattr(proyecto, 'riesgo_social_impacto', 2)
+        data['riesgo_financiero_probabilidad'] = getattr(proyecto, 'riesgo_financiero_probabilidad', 2)
+        data['riesgo_financiero_impacto'] = getattr(proyecto, 'riesgo_financiero_impacto', 3)
+        data['riesgo_regulatorio_probabilidad'] = getattr(proyecto, 'riesgo_regulatorio_probabilidad', 2)
+        data['riesgo_regulatorio_impacto'] = getattr(proyecto, 'riesgo_regulatorio_impacto', 2)
+
+        # Campo duración estimada
+        data['duracion_estimada_meses'] = getattr(proyecto, 'duracion_estimada_meses', proyecto.duracion_meses)
+
+        return data
 
     def _dict_to_proyecto(self, data: Dict[str, Any]) -> ProyectoSocial:
         """
@@ -125,13 +160,19 @@ class DatabaseManager:
         Returns:
             Objeto ProyectoSocial
         """
-        # Deserializar campos JSON
+        # Deserializar campos JSON básicos
         ods_vinculados = json.loads(data['ods_vinculados'])
         departamentos = json.loads(data['departamentos'])
         municipios = json.loads(data['municipios']) if data['municipios'] else []
         indicadores_impacto = json.loads(data['indicadores_impacto'])
 
+        # Deserializar campos JSON de Arquitectura C (con valores por defecto)
+        sectores = json.loads(data.get('sectores', '[]')) if 'sectores' in data else []
+        puntajes_pdet = json.loads(data.get('puntajes_pdet', '{}')) if 'puntajes_pdet' in data else {}
+        stakeholders_involucrados = json.loads(data.get('stakeholders_involucrados', '[]')) if 'stakeholders_involucrados' in data else []
+
         return ProyectoSocial(
+            # Campos básicos
             id=data['id'],
             nombre=data['nombre'],
             organizacion=data['organizacion'],
@@ -146,7 +187,39 @@ class DatabaseManager:
             departamentos=departamentos,
             municipios=municipios,
             estado=EstadoProyecto(data['estado']),
-            indicadores_impacto=indicadores_impacto
+            indicadores_impacto=indicadores_impacto,
+
+            # Campos Arquitectura C - PDET/Probabilidad
+            sectores=sectores,
+            puntajes_pdet=puntajes_pdet,
+            tiene_municipios_pdet=bool(data.get('tiene_municipios_pdet', 0)),
+            puntaje_sectorial_max=data.get('puntaje_sectorial_max', 0),
+
+            # Campos SROI adicionales
+            observaciones_sroi=data.get('observaciones_sroi', ''),
+            nivel_confianza_sroi=data.get('nivel_confianza_sroi', ''),
+            fecha_calculo_sroi=data.get('fecha_calculo_sroi', ''),
+            metodologia_sroi=data.get('metodologia_sroi', ''),
+
+            # Campos Stakeholders
+            pertinencia_operacional=data.get('pertinencia_operacional', 3),
+            mejora_relacionamiento=data.get('mejora_relacionamiento', 3),
+            stakeholders_involucrados=stakeholders_involucrados,
+            en_corredor_transmision=bool(data.get('en_corredor_transmision', 0)),
+            observaciones_stakeholders=data.get('observaciones_stakeholders', ''),
+
+            # Campos Riesgos
+            riesgo_tecnico_probabilidad=data.get('riesgo_tecnico_probabilidad', 2),
+            riesgo_tecnico_impacto=data.get('riesgo_tecnico_impacto', 2),
+            riesgo_social_probabilidad=data.get('riesgo_social_probabilidad', 2),
+            riesgo_social_impacto=data.get('riesgo_social_impacto', 2),
+            riesgo_financiero_probabilidad=data.get('riesgo_financiero_probabilidad', 2),
+            riesgo_financiero_impacto=data.get('riesgo_financiero_impacto', 3),
+            riesgo_regulatorio_probabilidad=data.get('riesgo_regulatorio_probabilidad', 2),
+            riesgo_regulatorio_impacto=data.get('riesgo_regulatorio_impacto', 2),
+
+            # Campo duración estimada
+            duracion_estimada_meses=data.get('duracion_estimada_meses', data['duracion_meses'])
         )
 
     def crear_proyecto(self, proyecto: ProyectoSocial) -> bool:
@@ -168,7 +241,7 @@ class DatabaseManager:
             if cursor.fetchone():
                 return False
 
-            # Insertar proyecto
+            # Insertar proyecto con todos los campos
             data = self._proyecto_to_dict(proyecto)
             cursor.execute("""
                 INSERT INTO proyectos (
@@ -177,15 +250,37 @@ class DatabaseManager:
                     duracion_meses, presupuesto_total, ods_vinculados,
                     area_geografica, poblacion_objetivo, departamentos,
                     municipios, estado, indicadores_impacto,
-                    fecha_creacion, fecha_modificacion
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    fecha_creacion, fecha_modificacion,
+                    sectores, puntajes_pdet, tiene_municipios_pdet, puntaje_sectorial_max,
+                    observaciones_sroi, nivel_confianza_sroi, fecha_calculo_sroi, metodologia_sroi,
+                    pertinencia_operacional, mejora_relacionamiento, stakeholders_involucrados,
+                    en_corredor_transmision, observaciones_stakeholders,
+                    riesgo_tecnico_probabilidad, riesgo_tecnico_impacto,
+                    riesgo_social_probabilidad, riesgo_social_impacto,
+                    riesgo_financiero_probabilidad, riesgo_financiero_impacto,
+                    riesgo_regulatorio_probabilidad, riesgo_regulatorio_impacto,
+                    duracion_estimada_meses
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                          ?, ?, ?, ?)
             """, (
+                # Campos básicos
                 data['id'], data['nombre'], data['organizacion'], data['descripcion'],
                 data['beneficiarios_directos'], data['beneficiarios_indirectos'],
                 data['duracion_meses'], data['presupuesto_total'], data['ods_vinculados'],
                 data['area_geografica'], data['poblacion_objetivo'], data['departamentos'],
                 data['municipios'], data['estado'], data['indicadores_impacto'],
-                data['fecha_creacion'], data['fecha_modificacion']
+                data['fecha_creacion'], data['fecha_modificacion'],
+                # Campos Arquitectura C
+                data['sectores'], data['puntajes_pdet'], data['tiene_municipios_pdet'], data['puntaje_sectorial_max'],
+                data['observaciones_sroi'], data['nivel_confianza_sroi'], data['fecha_calculo_sroi'], data['metodologia_sroi'],
+                data['pertinencia_operacional'], data['mejora_relacionamiento'], data['stakeholders_involucrados'],
+                data['en_corredor_transmision'], data['observaciones_stakeholders'],
+                data['riesgo_tecnico_probabilidad'], data['riesgo_tecnico_impacto'],
+                data['riesgo_social_probabilidad'], data['riesgo_social_impacto'],
+                data['riesgo_financiero_probabilidad'], data['riesgo_financiero_impacto'],
+                data['riesgo_regulatorio_probabilidad'], data['riesgo_regulatorio_impacto'],
+                data['duracion_estimada_meses']
             ))
 
             # Registrar en historial
@@ -253,7 +348,7 @@ class DatabaseManager:
         if not cursor.fetchone():
             return False
 
-        # Actualizar proyecto
+        # Actualizar proyecto con todos los campos
         data = self._proyecto_to_dict(proyecto)
         data['fecha_modificacion'] = datetime.now().isoformat()
 
@@ -264,15 +359,37 @@ class DatabaseManager:
                 duracion_meses = ?, presupuesto_total = ?, ods_vinculados = ?,
                 area_geografica = ?, poblacion_objetivo = ?, departamentos = ?,
                 municipios = ?, estado = ?, indicadores_impacto = ?,
-                fecha_modificacion = ?
+                fecha_modificacion = ?,
+                sectores = ?, puntajes_pdet = ?, tiene_municipios_pdet = ?, puntaje_sectorial_max = ?,
+                observaciones_sroi = ?, nivel_confianza_sroi = ?, fecha_calculo_sroi = ?, metodologia_sroi = ?,
+                pertinencia_operacional = ?, mejora_relacionamiento = ?, stakeholders_involucrados = ?,
+                en_corredor_transmision = ?, observaciones_stakeholders = ?,
+                riesgo_tecnico_probabilidad = ?, riesgo_tecnico_impacto = ?,
+                riesgo_social_probabilidad = ?, riesgo_social_impacto = ?,
+                riesgo_financiero_probabilidad = ?, riesgo_financiero_impacto = ?,
+                riesgo_regulatorio_probabilidad = ?, riesgo_regulatorio_impacto = ?,
+                duracion_estimada_meses = ?
             WHERE id = ?
         """, (
+            # Campos básicos
             data['nombre'], data['organizacion'], data['descripcion'],
             data['beneficiarios_directos'], data['beneficiarios_indirectos'],
             data['duracion_meses'], data['presupuesto_total'], data['ods_vinculados'],
             data['area_geografica'], data['poblacion_objetivo'], data['departamentos'],
             data['municipios'], data['estado'], data['indicadores_impacto'],
-            data['fecha_modificacion'], proyecto.id
+            data['fecha_modificacion'],
+            # Campos Arquitectura C
+            data['sectores'], data['puntajes_pdet'], data['tiene_municipios_pdet'], data['puntaje_sectorial_max'],
+            data['observaciones_sroi'], data['nivel_confianza_sroi'], data['fecha_calculo_sroi'], data['metodologia_sroi'],
+            data['pertinencia_operacional'], data['mejora_relacionamiento'], data['stakeholders_involucrados'],
+            data['en_corredor_transmision'], data['observaciones_stakeholders'],
+            data['riesgo_tecnico_probabilidad'], data['riesgo_tecnico_impacto'],
+            data['riesgo_social_probabilidad'], data['riesgo_social_impacto'],
+            data['riesgo_financiero_probabilidad'], data['riesgo_financiero_impacto'],
+            data['riesgo_regulatorio_probabilidad'], data['riesgo_regulatorio_impacto'],
+            data['duracion_estimada_meses'],
+            # WHERE
+            proyecto.id
         ))
 
         # Registrar en historial
