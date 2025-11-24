@@ -853,28 +853,180 @@ def mostrar_resultado(resultado, proyecto, datos_basicos):
 
     # Botones de acción
     st.markdown("---")
-
-    col1, col2, col3 = st.columns(3)
-
+    
+    # ========== SECCIÓN DE EXPORTACIÓN ==========
+    st.markdown("### 📥 Exportar Evaluación")
+    
+    st.info("""
+    **Descargue la evaluación completa del proyecto** en formato ejecutivo para:
+    - Presentaciones a juntas directivas
+    - Seguimiento y documentación
+    - Archivo histórico del proyecto
+    """)
+    
+    # Importar exportador
+    from servicios.exportador_proyecto import ExportadorProyectoIndividual
+    
+    # Crear exportador
+    exportador = ExportadorProyectoIndividual(proyecto, resultado, datos_basicos)
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
     with col1:
-        if st.button("💾 Guardar Proyecto", type="primary", use_container_width=True):
-            db = get_db()
-            try:
-                db.guardar_proyecto(proyecto)
-                st.session_state.proyectos.append(proyecto)
-                st.success("✅ Proyecto guardado en la base de datos")
-                st.balloons()
-            except Exception as e:
-                st.error(f"❌ Error al guardar: {str(e)}")
+        try:
+            word_data = exportador.exportar_word()
+            st.download_button(
+                label="📝 Word",
+                data=word_data,
+                file_name=f"{proyecto.nombre.replace(' ', '_')}_evaluacion.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                help="Documento Word completo con toda la evaluación"
+            )
+        except Exception as e:
+            st.error(f"Error Word: {str(e)[:50]}")
+    
+    with col2:
+        try:
+            pdf_data = exportador.exportar_pdf()
+            st.download_button(
+                label="📑 PDF Completo",
+                data=pdf_data,
+                file_name=f"{proyecto.nombre.replace(' ', '_')}_evaluacion.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                help="PDF con gráficos y formato profesional"
+            )
+        except Exception as e:
+            st.error(f"Error PDF: {str(e)[:50]}")
+    
+    with col3:
+        try:
+            excel_data = exportador.exportar_excel()
+            st.download_button(
+                label="📊 Excel",
+                data=excel_data,
+                file_name=f"{proyecto.nombre.replace(' ', '_')}_evaluacion.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                help="Excel con múltiples hojas (Resumen, Criterios, Detalles)"
+            )
+        except Exception as e:
+            st.error(f"Error Excel: {str(e)[:50]}")
+    
+    with col4:
+        try:
+            resumen_data = exportador.exportar_resumen_ejecutivo()
+            st.download_button(
+                label="📄 Resumen (1 pág)",
+                data=resumen_data,
+                file_name=f"{proyecto.nombre.replace(' ', '_')}_resumen.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                help="Resumen ejecutivo de 1 página para juntas"
+            )
+        except Exception as e:
+            st.error(f"Error Resumen: {str(e)[:50]}")
+    
+    st.markdown("---")
+    
+    # ========== SECCIÓN DE GUARDADO Y NAVEGACIÓN ==========
+    st.markdown("### 💾 Guardar y Gestionar Proyecto")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("💾 Guardar Proyecto en BD", type="primary", use_container_width=True):
+            # Verificar que existe proyecto en session_state
+            if 'ultimo_proyecto' not in st.session_state or st.session_state.ultimo_proyecto is None:
+                st.error("❌ No hay proyecto para guardar. Primero calcule el score con el botón de arriba.")
+            elif 'ultimo_resultado' not in st.session_state or st.session_state.ultimo_resultado is None:
+                st.error("❌ No hay resultado de evaluación. Primero calcule el score.")
+            else:
+                # Obtener proyecto y resultado de session_state
+                proyecto_a_guardar = st.session_state.ultimo_proyecto
+                resultado_guardado = st.session_state.ultimo_resultado
 
+                db = get_db()
+
+                # Debug: Mostrar información del proyecto
+                st.info(f"""
+                **🔍 Debug - Intentando guardar:**
+                - ID: `{proyecto_a_guardar.id}`
+                - Nombre: {proyecto_a_guardar.nombre}
+                - Organización: {proyecto_a_guardar.organizacion}
+                - Presupuesto: ${proyecto_a_guardar.presupuesto_total:,.0f}
+                - Score: {resultado_guardado.score_total:.1f}/100
+                """)
+
+                try:
+                    # Guardar proyecto usando el método correcto
+                    guardado_exitoso = db.crear_proyecto(proyecto_a_guardar)
+
+                    # Verificar si el guardado fue exitoso
+                    if guardado_exitoso:
+                        # Inicializar lista de proyectos si no existe
+                        if 'proyectos' not in st.session_state:
+                            st.session_state.proyectos = []
+
+                        # Agregar a session state si no está
+                        if proyecto_a_guardar not in st.session_state.proyectos:
+                            st.session_state.proyectos.append(proyecto_a_guardar)
+
+                        # Marcar como guardado para evitar duplicados
+                        st.session_state.proyecto_guardado = True
+                        st.session_state.ultimo_id_guardado = proyecto_a_guardar.id
+
+                        # Mostrar confirmación con detalles
+                        st.success(f"""
+                        ✅ **Proyecto guardado exitosamente**
+
+                        - **ID:** `{proyecto_a_guardar.id}`
+                        - **Nombre:** {proyecto_a_guardar.nombre}
+                        - **Score:** {resultado_guardado.score_total:.1f}/100
+                        - **Nivel:** {resultado_guardado.nivel_prioridad}
+                        """)
+
+                        st.balloons()
+
+                        # Mostrar opciones de navegación
+                        st.info("""
+                        **Próximos pasos:**
+                        - Ir a **"🔍 Buscar y Editar"** para ver el proyecto guardado
+                        - Ir a **"📊 Evaluar Cartera"** para comparar con otros proyectos
+                        - Crear un **nuevo proyecto** con el botón de abajo
+                        """)
+                    else:
+                        # El proyecto ya existe
+                        st.warning(f"""
+                        ⚠️ **El proyecto ya existe en la base de datos**
+
+                        - **ID:** `{proyecto_a_guardar.id}`
+                        - **Nombre:** {proyecto_a_guardar.nombre}
+
+                        Un proyecto con este ID ya fue guardado previamente.
+                        Si deseas actualizar el proyecto, ve a **"🔍 Buscar y Editar"**.
+                        """)
+
+                except Exception as e:
+                    st.error(f"❌ Error al guardar proyecto: {str(e)}")
+                    import traceback
+                    with st.expander("Ver detalles del error"):
+                        st.code(traceback.format_exc())
+    
     with col2:
         if st.button("🔄 Nuevo Proyecto", use_container_width=True):
             limpiar_session_state()
             st.rerun()
-
+    
     with col3:
         if st.button("📊 Ver en Cartera", use_container_width=True):
-            st.info("Navegue al menú 'Evaluar Cartera' para ver el proyecto")
+            st.info("""
+            **Para ver este proyecto en la cartera:**
+            1. Primero guárdelo con el botón "💾 Guardar Proyecto"
+            2. Luego navegue al menú **"📊 Evaluar Cartera"**
+            3. El proyecto aparecerá en la lista de selección
+            """)
 
 
 # ============================================================================
