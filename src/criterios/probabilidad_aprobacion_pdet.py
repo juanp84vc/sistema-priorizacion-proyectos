@@ -62,6 +62,7 @@ class ProbabilidadAprobacionCriterio(CriterioEvaluacion):
             db_path: Ruta a base de datos con matriz PDET
         """
         super().__init__(peso)
+        self.nombre = "Probabilidad de Aprobación PDET"
         self.probabilidad_manual = probabilidad_manual
 
         # Conectar a repositorio matriz PDET
