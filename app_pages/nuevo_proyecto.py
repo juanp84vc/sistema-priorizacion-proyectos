@@ -51,9 +51,12 @@ def limpiar_session_state():
     """Limpia los datos del formulario del session state"""
     keys_to_delete = [
         'datos_basicos',
+        'datos_basicos_guardados',
         'criterios',
         'ultimo_resultado',
         'ultimo_proyecto',
+        'proyecto_guardado',
+        'ultimo_id_guardado',
         # Campos del formulario
         'form_nombre',
         'form_organizacion',
@@ -753,9 +756,19 @@ def seccion_revision_calculo(datos_basicos: Dict, criterios: Dict):
         # Guardar en session state
         st.session_state.ultimo_resultado = resultado
         st.session_state.ultimo_proyecto = proyecto
+        st.session_state.datos_basicos_guardados = datos_basicos
 
-        # Mostrar resultado
-        mostrar_resultado(resultado, proyecto, datos_basicos)
+    # IMPORTANTE: Mostrar resultado FUERA del if calcular
+    # Esto permite que el botón "Guardar" funcione en el rerun
+    if 'ultimo_resultado' in st.session_state and st.session_state.ultimo_resultado is not None:
+        if 'ultimo_proyecto' in st.session_state and st.session_state.ultimo_proyecto is not None:
+            # Obtener datos de session_state
+            resultado_mostrar = st.session_state.ultimo_resultado
+            proyecto_mostrar = st.session_state.ultimo_proyecto
+            datos_basicos_mostrar = st.session_state.get('datos_basicos_guardados', datos_basicos)
+
+            # Mostrar resultado (incluye botón Guardar)
+            mostrar_resultado(resultado_mostrar, proyecto_mostrar, datos_basicos_mostrar)
 
 
 def mostrar_resultado(resultado, proyecto, datos_basicos):
