@@ -35,74 +35,90 @@ def formatear_numero(numero: float, decimales: int = 2) -> str:
 
 def show():
     """Muestra el dashboard con visualizaciones."""
-    st.markdown("<h1 class='main-header'>📈 Dashboard de Proyectos</h1>",
+    st.markdown('<h1 class="main-header animate-fade-in-down">📈 Dashboard de Proyectos</h1>',
                 unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: #cbd5e1; margin-bottom: 2rem;">Visualiza el impacto de tu portafolio de proyectos</p>', unsafe_allow_html=True)
     st.markdown("---")
 
     # Verificar que hay proyectos
     if len(st.session_state.proyectos) == 0:
-        st.warning("⚠️ No hay proyectos registrados. Ve a 'Nuevo Proyecto' para agregar proyectos.")
+        st.markdown("""
+        <div class="info-box" style="text-align: center; padding: 3rem;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">📊</div>
+            <h3 style="color: #f8fafc; margin-bottom: 1rem;">No hay proyectos registrados</h3>
+            <p style="color: #cbd5e1;">Ve a 'Nuevo Proyecto' para agregar proyectos y visualizar métricas</p>
+        </div>
+        """, unsafe_allow_html=True)
         return
 
     proyectos = st.session_state.proyectos
 
-    # Métricas principales
-    st.markdown("### 📊 Métricas Generales")
+    # Métricas principales con diseño moderno
+    st.markdown('<h2 class="section-header">📊 Métricas Generales</h2>', unsafe_allow_html=True)
 
     col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
-        st.metric(
-            "Total Proyectos",
-            len(proyectos)
-        )
+        st.markdown("""
+        <div class="metric-card" style="text-align: center;">
+            <p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">TOTAL PROYECTOS</p>
+            <h2 class="text-gradient-primary" style="margin: 0.5rem 0; font-size: 2rem;">{}</h2>
+        </div>
+        """.format(len(proyectos)), unsafe_allow_html=True)
 
+    presupuesto_total = sum(p.presupuesto_total for p in proyectos)
     with col2:
-        presupuesto_total = sum(p.presupuesto_total for p in proyectos)
-        st.metric(
-            "Presupuesto Total",
-            f"${formatear_numero(presupuesto_total / 1e6, 1)}M"
-        )
+        st.markdown("""
+        <div class="metric-card" style="text-align: center;">
+            <p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">PRESUPUESTO TOTAL</p>
+            <h2 class="text-gradient-primary" style="margin: 0.5rem 0; font-size: 2rem;">${}M</h2>
+        </div>
+        """.format(formatear_numero(presupuesto_total / 1e6, 1)), unsafe_allow_html=True)
 
+    beneficiarios_total = sum(p.beneficiarios_totales for p in proyectos)
     with col3:
-        beneficiarios_total = sum(p.beneficiarios_totales for p in proyectos)
-        st.metric(
-            "Beneficiarios Totales",
-            formatear_numero(beneficiarios_total, 0)
-        )
+        st.markdown("""
+        <div class="metric-card" style="text-align: center;">
+            <p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">BENEFICIARIOS TOTALES</p>
+            <h2 class="text-gradient-primary" style="margin: 0.5rem 0; font-size: 2rem;">{}</h2>
+        </div>
+        """.format(formatear_numero(beneficiarios_total, 0)), unsafe_allow_html=True)
 
+    costo_promedio = presupuesto_total / beneficiarios_total if beneficiarios_total > 0 else 0
     with col4:
-        costo_promedio = presupuesto_total / beneficiarios_total if beneficiarios_total > 0 else 0
-        st.metric(
-            "Costo Promedio/Beneficiario",
-            f"${formatear_numero(costo_promedio)}"
-        )
+        st.markdown("""
+        <div class="metric-card" style="text-align: center;">
+            <p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">COSTO/BENEFICIARIO</p>
+            <h2 class="text-gradient-primary" style="margin: 0.5rem 0; font-size: 2rem;">${}</h2>
+        </div>
+        """.format(formatear_numero(costo_promedio)), unsafe_allow_html=True)
 
+    # Calcular SROI promedio del portafolio
+    sroi_total = 0
+    proyectos_con_sroi = 0
+    for p in proyectos:
+        sroi_valor = p.indicadores_impacto.get('sroi', 0.0)
+        try:
+            sroi_num = float(sroi_valor) if sroi_valor else 0.0
+            if sroi_num > 0:
+                sroi_total += sroi_num
+                proyectos_con_sroi += 1
+        except (ValueError, TypeError):
+            pass
+
+    sroi_promedio = sroi_total / proyectos_con_sroi if proyectos_con_sroi > 0 else 0
     with col5:
-        # Calcular SROI promedio del portafolio
-        sroi_total = 0
-        proyectos_con_sroi = 0
-        for p in proyectos:
-            sroi_valor = p.indicadores_impacto.get('sroi', 0.0)
-            try:
-                sroi_num = float(sroi_valor) if sroi_valor else 0.0
-                if sroi_num > 0:
-                    sroi_total += sroi_num
-                    proyectos_con_sroi += 1
-            except (ValueError, TypeError):
-                pass
-
-        sroi_promedio = sroi_total / proyectos_con_sroi if proyectos_con_sroi > 0 else 0
-        st.metric(
-            "SROI Promedio Portfolio",
-            f"{formatear_numero(sroi_promedio, 1)}:1" if sroi_promedio > 0 else "N/A",
-            help=f"Retorno Social de la Inversión promedio de {proyectos_con_sroi} proyectos"
-        )
+        st.markdown("""
+        <div class="metric-card" style="text-align: center;">
+            <p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">SROI PROMEDIO</p>
+            <h2 class="text-gradient-accent" style="margin: 0.5rem 0; font-size: 2rem;">{}</h2>
+        </div>
+        """.format(f"{formatear_numero(sroi_promedio, 1)}:1" if sroi_promedio > 0 else "N/A"), unsafe_allow_html=True)
 
     st.markdown("---")
 
     # Visualizaciones
-    st.markdown("### 🌍 Distribución Geográfica")
+    st.markdown('<h2 class="section-header">🌍 Distribución Geográfica</h2>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
@@ -120,7 +136,15 @@ def show():
             df_areas,
             values='Proyectos',
             names='Área',
-            title='Proyectos por Área Geográfica'
+            title='Proyectos por Área Geográfica',
+            color_discrete_sequence=['#10b981', '#06b6d4', '#8b5cf6', '#f59e0b', '#ef4444']
+        )
+        
+        fig_areas.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#cbd5e1', family='Inter'),
+            title_font=dict(size=16, color='#f8fafc')
         )
 
         st.plotly_chart(fig_areas, use_container_width=True)
@@ -145,10 +169,19 @@ def show():
             y='Proyectos',
             title='Top 10 Departamentos',
             color='Proyectos',
-            color_continuous_scale='Viridis'
+            color_continuous_scale=[[0, '#10b981'], [0.5, '#06b6d4'], [1, '#8b5cf6']]
         )
 
-        fig_deptos.update_layout(showlegend=False, xaxis_tickangle=-45)
+        fig_deptos.update_layout(
+            showlegend=False, 
+            xaxis_tickangle=-45,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#cbd5e1', family='Inter'),
+            title_font=dict(size=16, color='#f8fafc'),
+            xaxis=dict(gridcolor='rgba(255,255,255,0.1)'),
+            yaxis=dict(gridcolor='rgba(255,255,255,0.1)')
+        )
 
         st.plotly_chart(fig_deptos, use_container_width=True)
 
@@ -158,7 +191,7 @@ def show():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("### 💰 Presupuesto por Proyecto")
+        st.markdown('<h3 style="color: #f8fafc; margin-bottom: 1rem;">💰 Presupuesto por Proyecto</h3>', unsafe_allow_html=True)
 
         df_presupuesto = pd.DataFrame([
             {
@@ -177,15 +210,23 @@ def show():
             orientation='h',
             title='Presupuesto por Proyecto',
             color='Presupuesto',
-            color_continuous_scale='Blues'
+            color_continuous_scale=[[0, '#10b981'], [0.5, '#06b6d4'], [1, '#8b5cf6']]
         )
 
-        fig_presupuesto.update_layout(showlegend=False)
+        fig_presupuesto.update_layout(
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#cbd5e1', family='Inter'),
+            title_font=dict(size=16, color='#f8fafc'),
+            xaxis=dict(gridcolor='rgba(255,255,255,0.1)'),
+            yaxis=dict(gridcolor='rgba(255,255,255,0.1)')
+        )
 
         st.plotly_chart(fig_presupuesto, use_container_width=True)
 
     with col2:
-        st.markdown("### 👥 Beneficiarios por Proyecto")
+        st.markdown('<h3 style="color: #f8fafc; margin-bottom: 1rem;">👥 Beneficiarios por Proyecto</h3>', unsafe_allow_html=True)
 
         df_beneficiarios = pd.DataFrame([
             {
@@ -203,7 +244,7 @@ def show():
             x=df_beneficiarios['Directos'],
             name='Directos',
             orientation='h',
-            marker=dict(color='#636EFA')
+            marker=dict(color='#10b981')
         ))
 
         fig_beneficiarios.add_trace(go.Bar(
@@ -211,14 +252,20 @@ def show():
             x=df_beneficiarios['Indirectos'],
             name='Indirectos',
             orientation='h',
-            marker=dict(color='#00CC96')
+            marker=dict(color='#06b6d4')
         ))
 
         fig_beneficiarios.update_layout(
             barmode='stack',
             title='Beneficiarios Directos e Indirectos',
             xaxis_title='Beneficiarios',
-            yaxis_title='Proyecto'
+            yaxis_title='Proyecto',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#cbd5e1', family='Inter'),
+            title_font=dict(size=16, color='#f8fafc'),
+            xaxis=dict(gridcolor='rgba(255,255,255,0.1)'),
+            yaxis=dict(gridcolor='rgba(255,255,255,0.1)')
         )
 
         st.plotly_chart(fig_beneficiarios, use_container_width=True)
@@ -229,7 +276,7 @@ def show():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("### ⏱️ Duración de Proyectos")
+        st.markdown('<h3 style="color: #f8fafc; margin-bottom: 1rem;">⏱️ Duración de Proyectos</h3>', unsafe_allow_html=True)
 
         df_duracion = pd.DataFrame([
             {
@@ -245,14 +292,23 @@ def show():
             y='Proyecto',
             size='Duración (años)',
             color='Duración (años)',
-            color_continuous_scale='Reds',
+            color_continuous_scale=[[0, '#f59e0b'], [0.5, '#ef4444'], [1, '#8b5cf6']],
             title='Duración de Proyectos'
+        )
+        
+        fig_duracion.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#cbd5e1', family='Inter'),
+            title_font=dict(size=16, color='#f8fafc'),
+            xaxis=dict(gridcolor='rgba(255,255,255,0.1)'),
+            yaxis=dict(gridcolor='rgba(255,255,255,0.1)')
         )
 
         st.plotly_chart(fig_duracion, use_container_width=True)
 
     with col2:
-        st.markdown("### 📊 Eficiencia: Costo/Beneficiario")
+        st.markdown('<h3 style="color: #f8fafc; margin-bottom: 1rem;">📊 Eficiencia: Costo/Beneficiario</h3>', unsafe_allow_html=True)
 
         df_eficiencia = pd.DataFrame([
             {
@@ -271,14 +327,24 @@ def show():
             orientation='h',
             title='Costo por Beneficiario (menor es mejor)',
             color='Costo/Beneficiario',
-            color_continuous_scale='RdYlGn_r'
+            color_continuous_scale=[[0, '#10b981'], [0.5, '#f59e0b'], [1, '#ef4444']]
+        )
+        
+        fig_eficiencia.update_layout(
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#cbd5e1', family='Inter'),
+            title_font=dict(size=16, color='#f8fafc'),
+            xaxis=dict(gridcolor='rgba(255,255,255,0.1)'),
+            yaxis=dict(gridcolor='rgba(255,255,255,0.1)')
         )
 
         st.plotly_chart(fig_eficiencia, use_container_width=True)
 
     # SROI por proyecto
     st.markdown("---")
-    st.markdown("### 📈 Retorno Social de la Inversión (SROI)")
+    st.markdown('<h2 class="section-header">📈 Retorno Social de la Inversión (SROI)</h2>', unsafe_allow_html=True)
 
     # Filtrar proyectos con SROI
     proyectos_sroi = []
@@ -305,7 +371,7 @@ def show():
             orientation='h',
             title='Retorno Social por Proyecto (mayor es mejor)',
             color='SROI',
-            color_continuous_scale='Greens',
+            color_continuous_scale=[[0, '#10b981'], [0.5, '#06b6d4'], [1, '#8b5cf6']],
             text='SROI'
         )
 
@@ -317,7 +383,13 @@ def show():
         fig_sroi.update_layout(
             xaxis_title='SROI (retorno por cada peso invertido)',
             yaxis_title='Proyecto',
-            showlegend=False
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#cbd5e1', family='Inter'),
+            title_font=dict(size=16, color='#f8fafc'),
+            xaxis=dict(gridcolor='rgba(255,255,255,0.1)'),
+            yaxis=dict(gridcolor='rgba(255,255,255,0.1)')
         )
 
         st.plotly_chart(fig_sroi, use_container_width=True)

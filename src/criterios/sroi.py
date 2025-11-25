@@ -79,16 +79,15 @@ class SROICriterio:
             Score 0-100 basado en rangos aprobados
 
         Raises:
-            ValueError: Si SROI no está definido o es inválido
+            ValueError: Si SROI es inválido
         """
-        # Obtener SROI
+        # Obtener SROI (usar valor por defecto si no está definido)
         sroi = proyecto.indicadores_impacto.get('sroi')
 
         if sroi is None:
-            raise ValueError(
-                "SROI no definido. "
-                "proyecto.indicadores_impacto debe contener 'sroi'"
-            )
+            # Valor por defecto conservador: 1.5 (prioridad baja, score 60)
+            # Esto permite evaluar proyectos antiguos sin SROI definido
+            sroi = 1.5
 
         if not isinstance(sroi, (int, float)):
             raise ValueError(f"SROI debe ser numérico, recibido: {type(sroi).__name__}")

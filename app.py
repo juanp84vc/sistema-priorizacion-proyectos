@@ -23,51 +23,30 @@ from database.db_manager import get_db_manager
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Sistema de Priorización de Proyectos",
+    page_title="Sistema de Priorización de Proyectos | Valor Compartido",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1f77b4;
-        text-align: center;
-        padding: 1rem 0;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 0.5rem 0;
-    }
-    .success-box {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        color: #155724;
-    }
-    .warning-box {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        background-color: #fff3cd;
-        border: 1px solid #ffeaa7;
-        color: #856404;
-    }
-    .info-box {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        background-color: #d1ecf1;
-        border: 1px solid #bee5eb;
-        color: #0c5460;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Cargar CSS personalizado moderno
+def load_css():
+    """Carga el archivo CSS personalizado."""
+    css_file = Path(__file__).parent / "static" / "styles.css"
+    if css_file.exists():
+        with open(css_file) as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    else:
+        # Fallback CSS básico si no existe el archivo
+        st.markdown("""
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+            * { font-family: 'Inter', sans-serif; }
+            .main { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+        </style>
+        """, unsafe_allow_html=True)
+
+load_css()
 
 # Inicializar base de datos
 @st.cache_resource
@@ -104,14 +83,17 @@ if 'gestor_historial' not in st.session_state:
 
 # Sidebar - Menú de navegación
 with st.sidebar:
-    st.markdown("### 🎯 Sistema de Priorización")
+    # Logo del sistema
+    logo_path = Path(__file__).parent / "static" / "images" / "logo_sistema.png"
+    if logo_path.exists():
+        st.image(str(logo_path), width=80)
+    
+    st.markdown('<h2 class="text-gradient-primary" style="text-align: center; margin: 0.5rem 0;">Sistema de Priorización</h2>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1rem;">Proyectos de Valor Compartido</p>', unsafe_allow_html=True)
     st.markdown("---")
 
-    # Logo o imagen (opcional)
-    st.markdown("#### Menú Principal")
-
     menu_option = st.radio(
-        "Selecciona una opción:",
+        "Navegación:",
         ["🏠 Inicio", "➕ Nuevo Proyecto", "🔍 Buscar y Editar",
          "📊 Evaluar Cartera", "🧪 Test Motor", "📚 Historial", "🤖 Asistente IA",
          "📖 Historial IA", "📈 Dashboard", "⚙️ Configuración"],
@@ -119,11 +101,16 @@ with st.sidebar:
     )
 
     st.markdown("---")
-    st.markdown(f"**Proyectos registrados:** {len(st.session_state.proyectos)}")
-
+    
+    # Métricas del sidebar con diseño mejorado
+    st.markdown('<div class="glass-card" style="padding: 1rem; margin: 1rem 0;">', unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">PROYECTOS REGISTRADOS</p>', unsafe_allow_html=True)
+    st.markdown(f'<h3 class="text-gradient-primary" style="margin: 0.25rem 0;">{len(st.session_state.proyectos)}</h3>', unsafe_allow_html=True)
+    
     if len(st.session_state.proyectos) > 0:
         ultimo = st.session_state.proyectos[-1]
-        st.markdown(f"*Último proyecto:*  \n{ultimo.nombre[:30]}...")
+        st.markdown(f'<p style="font-size: 0.75rem; color: #cbd5e1; margin-top: 0.5rem;">Último: {ultimo.nombre[:25]}...</p>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Routing a las diferentes páginas
 if menu_option == "🏠 Inicio":
@@ -150,9 +137,15 @@ elif menu_option == "⚙️ Configuración":
 # Footer
 st.markdown("---")
 st.markdown(
-    "<div style='text-align: center; color: #666; font-size: 0.9rem;'>"
-    "Sistema de Priorización de Proyectos Sociales | "
-    "Desarrollado siguiendo Principios SOLID"
-    "</div>",
+    """
+    <div style='text-align: center; padding: 2rem 0 1rem 0;'>
+        <p class='text-gradient-primary' style='font-weight: 600; font-size: 1rem; margin: 0;'>
+            Sistema de Priorización de Proyectos Sociales
+        </p>
+        <p style='color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;'>
+            Valor Compartido • Desarrollado siguiendo Principios SOLID
+        </p>
+    </div>
+    """,
     unsafe_allow_html=True
 )

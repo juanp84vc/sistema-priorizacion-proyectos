@@ -50,7 +50,7 @@ class ScoringPonderado(EstrategiaEvaluacion):
             score_criterio = criterio.evaluar(proyecto)
             score_ponderado = score_criterio * criterio.peso
 
-            detalle_criterios[criterio.get_nombre()] = {
+            detalle_criterios[criterio.nombre] = {
                 'score_base': score_criterio,
                 'peso': criterio.peso,
                 'score_ponderado': score_ponderado

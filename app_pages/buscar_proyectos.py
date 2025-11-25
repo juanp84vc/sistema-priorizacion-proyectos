@@ -475,11 +475,9 @@ def show():
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.markdown(f"""
-                **Presupuesto:** ${formatear_numero(proyecto.presupuesto_total, 0)}
-                **Beneficiarios:** {formatear_numero(proyecto.beneficiarios_totales, 0)}
-                **Costo/Beneficiario:** ${formatear_numero(proyecto.presupuesto_por_beneficiario)}
-                """)
+                st.markdown(f"**💰 Presupuesto:** ${formatear_numero(proyecto.presupuesto_total, 0)}")
+                st.markdown(f"**👥 Beneficiarios Totales:** {formatear_numero(proyecto.beneficiarios_totales, 0)}")
+                st.markdown(f"**📉 Costo/Beneficiario:** ${formatear_numero(proyecto.presupuesto_por_beneficiario)}")
 
             with col2:
                 st.markdown(f"""
