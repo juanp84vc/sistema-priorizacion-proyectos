@@ -384,3 +384,11 @@ class RiesgosCriterio:
             Contribución al score final (0-15)
         """
         return score * self.peso
+
+    def get_nombre(self) -> str:
+        """Retorna el nombre del criterio"""
+        return self.nombre
+
+    def get_descripcion(self) -> str:
+        """Retorna la descripción del criterio"""
+        return self.descripcion
