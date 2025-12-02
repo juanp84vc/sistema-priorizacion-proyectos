@@ -1,10 +1,11 @@
-"""Página para evaluar y priorizar cartera de proyectos."""
+"""Página para evaluar y priorizar cartera de proyectos - Diseño Ejecutivo."""
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # Agregar src al path si no está
 src_path = str(Path(__file__).parent.parent / "src")
@@ -19,6 +20,27 @@ from criterios import (
 )
 from estrategias import ScoringPonderado, ScoringUmbral
 from servicios import SistemaPriorizacionProyectos, ExportadorResultados, RecomendadorProyectos
+
+# Importar exportador de cartera profesional
+try:
+    from servicios.exportador_cartera import ExportadorCartera
+except ImportError:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "exportador_cartera",
+        Path(__file__).parent.parent / "src" / "servicios" / "exportador_cartera.py"
+    )
+    exportador_cartera_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(exportador_cartera_module)
+    ExportadorCartera = exportador_cartera_module.ExportadorCartera
+
+# Importar componentes UI ejecutivos
+try:
+    from ui.componentes import ComponentesUI
+    from ui.estilos import EstilosUI
+    UI_DISPONIBLE = True
+except ImportError:
+    UI_DISPONIBLE = False
 
 
 def formatear_numero(numero: float, decimales: int = 2) -> str:
@@ -48,18 +70,40 @@ def formatear_numero(numero: float, decimales: int = 2) -> str:
 
 
 def show():
-    """Muestra la página de evaluación de cartera."""
-    st.markdown("<h1 class='main-header'>📊 Evaluar Cartera de Proyectos</h1>",
-                unsafe_allow_html=True)
-    st.markdown("---")
+    """Muestra la página de evaluación de cartera - Diseño Ejecutivo."""
+
+    # Header ejecutivo
+    if UI_DISPONIBLE:
+        ComponentesUI.header_ejecutivo(
+            titulo="Evaluación de Cartera",
+            subtitulo="Motor de priorización Arquitectura C - Análisis multicriterio",
+            mostrar_fecha=True
+        )
+    else:
+        st.markdown("<h1 class='main-header'>Evaluación de Cartera</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #94a3b8;'>Motor de priorización Arquitectura C</p>", unsafe_allow_html=True)
 
     # Verificar que hay proyectos
     if len(st.session_state.proyectos) == 0:
-        st.warning("⚠️ No hay proyectos registrados. Ve a 'Nuevo Proyecto' para agregar proyectos.")
+        st.markdown("""
+        <div style="background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+             border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 1rem;
+             padding: 2rem; text-align: center; margin: 2rem 0;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
+            <h3 style="color: #f8fafc; margin-bottom: 0.5rem;">No hay proyectos registrados</h3>
+            <p style="color: #94a3b8;">Agregue proyectos desde "Nuevo Proyecto" para evaluar la cartera</p>
+        </div>
+        """, unsafe_allow_html=True)
         return
 
+    # Metodología resumen
+    if UI_DISPONIBLE:
+        ComponentesUI.resumen_metodologia()
+
     # Configuración de evaluación
-    st.markdown("### ⚙️ Configuración de Evaluación")
+    st.markdown("""
+    <div class="seccion-titulo">Configuración de Evaluación</div>
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns([2, 1])
 
@@ -220,34 +264,28 @@ def show():
 
         # Mostrar resultados
         st.markdown("---")
-        st.markdown("## 📈 Resultados de Evaluación")
+        st.markdown("""
+        <div class="seccion-titulo">Resultados de Evaluación</div>
+        """, unsafe_allow_html=True)
 
-        # Métricas resumen
-        col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-            st.metric(
-                "Proyectos Evaluados",
-                reporte['total_proyectos']
-            )
-
-        with col2:
-            st.metric(
-                "Score Máximo",
-                formatear_numero(reporte['estadisticas']['score_maximo'], 1)
-            )
-
-        with col3:
-            st.metric(
-                "Score Promedio",
-                formatear_numero(reporte['estadisticas']['score_promedio'], 1)
-            )
-
-        with col4:
-            st.metric(
-                "Alta Prioridad",
-                reporte['estadisticas']['proyectos_alta_prioridad']
-            )
+        # KPIs ejecutivos de resultados
+        if UI_DISPONIBLE:
+            ComponentesUI.kpis_ejecutivos([
+                {'valor': reporte['total_proyectos'], 'etiqueta': 'Proyectos Evaluados'},
+                {'valor': formatear_numero(reporte['estadisticas']['score_maximo'], 1), 'etiqueta': 'Score Máximo'},
+                {'valor': formatear_numero(reporte['estadisticas']['score_promedio'], 1), 'etiqueta': 'Score Promedio'},
+                {'valor': reporte['estadisticas']['proyectos_alta_prioridad'], 'etiqueta': 'Alta Prioridad'}
+            ])
+        else:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Proyectos Evaluados", reporte['total_proyectos'])
+            with col2:
+                st.metric("Score Máximo", formatear_numero(reporte['estadisticas']['score_maximo'], 1))
+            with col3:
+                st.metric("Score Promedio", formatear_numero(reporte['estadisticas']['score_promedio'], 1))
+            with col4:
+                st.metric("Alta Prioridad", reporte['estadisticas']['proyectos_alta_prioridad'])
 
         # Ranking
         st.markdown("### 🏆 Ranking de Proyectos")
@@ -489,72 +527,132 @@ def show():
                         import traceback
                         st.code(traceback.format_exc())
 
-        # Botón para exportar
+        # Sección de Exportación Ejecutiva
         st.markdown("---")
-        st.markdown("### 📥 Exportar Resultados")
+        st.markdown("""
+        <div class="seccion-titulo">Exportar Informes para Comité</div>
+        <p style="color: #94a3b8; margin-bottom: 1rem;">Genere reportes profesionales para presentación al comité de aprobación</p>
+        """, unsafe_allow_html=True)
 
-        # Crear exportador con los datos (incluir gestor de historial)
+        # Crear exportadores
         gestor_historial = st.session_state.get('gestor_historial', None)
-        exportador = ExportadorResultados(reporte, resultados_detallados, gestor_historial)
+        exportador_basico = ExportadorResultados(reporte, resultados_detallados, gestor_historial)
+        exportador_profesional = ExportadorCartera(reporte, resultados_detallados)
 
-        col1, col2, col3, col4 = st.columns(4)
+        # Contenedor de reportes profesionales
+        st.markdown("""
+        <div style="background: linear-gradient(145deg, rgba(14, 165, 233, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%);
+             border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 1rem;
+             padding: 1.5rem; margin: 1rem 0;">
+            <h4 style="color: #f8fafc; margin: 0 0 1rem 0;">Reportes Ejecutivos</h4>
+        """, unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns(3)
 
         with col1:
-            # Exportar a CSV
             try:
-                csv_data = exportador.exportar_csv()
+                word_data = exportador_profesional.exportar_word()
                 st.download_button(
-                    label="📄 CSV",
-                    data=csv_data,
-                    file_name="evaluacion_proyectos.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    help="Descarga un archivo CSV con el ranking"
-                )
-            except Exception as e:
-                st.error(f"Error al generar CSV: {str(e)}")
-
-        with col2:
-            # Exportar a Excel
-            try:
-                excel_data = exportador.exportar_excel()
-                st.download_button(
-                    label="📊 Excel",
-                    data=excel_data,
-                    file_name="evaluacion_proyectos.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                    help="Descarga un archivo Excel con múltiples hojas"
-                )
-            except Exception as e:
-                st.error(f"Error al generar Excel: {str(e)}")
-
-        with col3:
-            # Exportar a Word
-            try:
-                word_data = exportador.exportar_word()
-                st.download_button(
-                    label="📝 Word",
+                    label="📝 Informe Word",
                     data=word_data,
-                    file_name="evaluacion_proyectos.docx",
+                    file_name=f"informe_cartera_{reporte.get('fecha', datetime.now().strftime('%Y%m%d'))}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True,
-                    help="Descarga un reporte en formato Word"
+                    help="Documento completo con portada, metodología, ranking y recomendaciones"
                 )
             except Exception as e:
-                st.error(f"Error al generar Word: {str(e)}")
+                st.error(f"Error Word: {str(e)}")
 
-        with col4:
-            # Exportar a PDF
+        with col2:
             try:
-                pdf_data = exportador.exportar_pdf()
+                excel_data = exportador_profesional.exportar_excel()
                 st.download_button(
-                    label="📑 PDF",
-                    data=pdf_data,
-                    file_name="evaluacion_proyectos.pdf",
-                    mime="application/pdf",
+                    label="📊 Análisis Excel",
+                    data=excel_data,
+                    file_name=f"analisis_cartera_{reporte.get('fecha', datetime.now().strftime('%Y%m%d'))}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
-                    help="Descarga un reporte en formato PDF"
+                    help="5 hojas: Resumen, Ranking, Comparativo, Detalle, Metodología"
                 )
             except Exception as e:
-                st.error(f"Error al generar PDF: {str(e)}")
+                st.error(f"Error Excel: {str(e)}")
+
+        with col3:
+            try:
+                pptx_data = exportador_profesional.exportar_powerpoint()
+                st.download_button(
+                    label="📽️ Presentación PPT",
+                    data=pptx_data,
+                    file_name=f"presentacion_comite_{reporte.get('fecha', datetime.now().strftime('%Y%m%d'))}.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True,
+                    help="5 slides ejecutivos para presentación al comité"
+                )
+            except Exception as e:
+                st.error(f"Error PowerPoint: {str(e)}")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Sección de exportaciones básicas (colapsable)
+        with st.expander("Exportaciones Básicas (CSV/PDF)", expanded=False):
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                # Exportar a CSV
+                try:
+                    csv_data = exportador_basico.exportar_csv()
+                    st.download_button(
+                        label="📄 CSV",
+                        data=csv_data,
+                        file_name="evaluacion_proyectos.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                        help="Descarga un archivo CSV con el ranking"
+                    )
+                except Exception as e:
+                    st.error(f"Error al generar CSV: {str(e)}")
+
+            with col2:
+                # Excel básico
+                try:
+                    excel_data = exportador_basico.exportar_excel()
+                    st.download_button(
+                        label="📊 Excel Básico",
+                        data=excel_data,
+                        file_name="evaluacion_proyectos.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        help="Excel básico con datos"
+                    )
+                except Exception as e:
+                    st.error(f"Error al generar Excel: {str(e)}")
+
+            with col3:
+                # Word básico
+                try:
+                    word_data = exportador_basico.exportar_word()
+                    st.download_button(
+                        label="📝 Word Básico",
+                        data=word_data,
+                        file_name="evaluacion_proyectos.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        help="Reporte básico en formato Word"
+                    )
+                except Exception as e:
+                    st.error(f"Error al generar Word: {str(e)}")
+
+            with col4:
+                # Exportar a PDF
+                try:
+                    pdf_data = exportador_basico.exportar_pdf()
+                    st.download_button(
+                        label="📑 PDF",
+                        data=pdf_data,
+                        file_name="evaluacion_proyectos.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        help="Descarga un reporte en formato PDF"
+                    )
+                except Exception as e:
+                    st.error(f"Error al generar PDF: {str(e)}")

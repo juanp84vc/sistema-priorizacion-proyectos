@@ -3,11 +3,24 @@ Módulo para exportar evaluación de un proyecto individual a diferentes formato
 Diseñado para presentaciones ejecutivas a juntas directivas.
 
 Soporta: Word, PDF, Excel y Resumen Ejecutivo (1 página)
+
+Actualizado Dic 2025: Integración con ExplicadorCriterios para explicaciones
+detalladas con fórmulas paso a paso.
 """
 import io
+import sys
+from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import pandas as pd
+
+# Agregar src al path para imports locales
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from reportes.explicaciones_criterios import ExplicadorCriterios
+except ImportError:
+    ExplicadorCriterios = None
 
 try:
     from docx import Document
@@ -280,11 +293,339 @@ Perfil de Riesgo General: {riesgo_total:.1f}/25
             analisis += "   - Mitigación: Cumplimiento normativo estándar\n"
         
         return analisis
-    
+
+    def _generar_explicacion_detallada_sroi(self) -> Dict[str, Any]:
+        """
+        Genera explicación detallada del SROI con fórmulas paso a paso.
+        Usa el módulo ExplicadorCriterios si está disponible.
+        """
+        if ExplicadorCriterios is None:
+            return {"error": "Módulo ExplicadorCriterios no disponible"}
+
+        sroi = self.proyecto.indicadores_impacto.get('sroi', 0)
+        return ExplicadorCriterios.explicar_sroi(
+            sroi_valor=sroi,
+            score=self.resultado.score_sroi,
+            contribucion=self.resultado.contribucion_sroi
+        )
+
+    def _generar_explicacion_detallada_stakeholders(self) -> Dict[str, Any]:
+        """
+        Genera explicación detallada de Stakeholders con fórmulas.
+        """
+        if ExplicadorCriterios is None:
+            return {"error": "Módulo ExplicadorCriterios no disponible"}
+
+        # Calcular scores de componentes (aproximados basados en inputs)
+        escala_pert = {5: 100, 4: 85, 3: 65, 2: 40, 1: 20}
+        escala_rel = {5: 100, 4: 85, 3: 65, 2: 40, 1: 20}
+
+        score_pertinencia = escala_pert.get(self.proyecto.pertinencia_operacional, 50)
+        score_relacionamiento = escala_rel.get(self.proyecto.mejora_relacionamiento, 50)
+
+        # Alcance territorial
+        score_alcance = 50
+        if self.proyecto.en_corredor_transmision:
+            score_alcance += 30
+        if len(self.proyecto.municipios or []) > 1:
+            score_alcance += 20
+        score_alcance = min(score_alcance, 100)
+
+        # Tipo stakeholders
+        puntajes_stak = {
+            'autoridades_locales': 25, 'lideres_comunitarios': 20,
+            'comunidades_indigenas': 25, 'organizaciones_sociales': 15,
+            'sector_privado': 10, 'academia': 10, 'medios_comunicacion': 5
+        }
+        puntaje_total = sum(puntajes_stak.get(s, 0) for s in (self.proyecto.stakeholders_involucrados or []))
+        score_tipo = min((puntaje_total / 110) * 100, 100) if puntaje_total > 0 else 50
+
+        return ExplicadorCriterios.explicar_stakeholders(
+            pertinencia=self.proyecto.pertinencia_operacional,
+            relacionamiento=self.proyecto.mejora_relacionamiento,
+            score_pertinencia=score_pertinencia,
+            score_relacionamiento=score_relacionamiento,
+            score_alcance=score_alcance,
+            score_tipo=score_tipo,
+            score_total=self.resultado.score_stakeholders,
+            contribucion=self.resultado.contribucion_stakeholders,
+            en_corredor=self.proyecto.en_corredor_transmision,
+            stakeholders_lista=self.proyecto.stakeholders_involucrados or [],
+            num_municipios=len(self.proyecto.municipios or [])
+        )
+
+    def _generar_explicacion_detallada_probabilidad(self) -> Dict[str, Any]:
+        """
+        Genera explicación detallada de Probabilidad PDET con fórmulas.
+        """
+        if ExplicadorCriterios is None:
+            return {"error": "Módulo ExplicadorCriterios no disponible"}
+
+        municipio = self.datos_basicos.get('municipio', 'N/A')
+        departamento = self.datos_basicos.get('departamento', 'N/A')
+        sector = self.proyecto.sectores[0] if self.proyecto.sectores else 'No especificado'
+
+        return ExplicadorCriterios.explicar_probabilidad(
+            municipio=municipio,
+            departamento=departamento,
+            es_pdet=self.proyecto.tiene_municipios_pdet,
+            sector=sector,
+            puntaje_sectorial=self.proyecto.puntaje_sectorial_max or 0,
+            score=self.resultado.score_probabilidad,
+            contribucion=self.resultado.contribucion_probabilidad
+        )
+
+    def _generar_explicacion_detallada_riesgos(self) -> Dict[str, Any]:
+        """
+        Genera explicación detallada de Riesgos con fórmulas.
+        """
+        if ExplicadorCriterios is None:
+            return {"error": "Módulo ExplicadorCriterios no disponible"}
+
+        # Calcular scores individuales de riesgos
+        def calc_score_riesgo(prob, imp):
+            severidad = prob * imp
+            return max(0, 100 - (severidad * 4))
+
+        score_tecnico = calc_score_riesgo(
+            self.proyecto.riesgo_tecnico_probabilidad,
+            self.proyecto.riesgo_tecnico_impacto
+        )
+        score_social = calc_score_riesgo(
+            self.proyecto.riesgo_social_probabilidad,
+            self.proyecto.riesgo_social_impacto
+        )
+        score_financiero = calc_score_riesgo(
+            self.proyecto.riesgo_financiero_probabilidad,
+            self.proyecto.riesgo_financiero_impacto
+        )
+        score_regulatorio = calc_score_riesgo(
+            self.proyecto.riesgo_regulatorio_probabilidad,
+            self.proyecto.riesgo_regulatorio_impacto
+        )
+
+        return ExplicadorCriterios.explicar_riesgos(
+            riesgo_tecnico=(self.proyecto.riesgo_tecnico_probabilidad, self.proyecto.riesgo_tecnico_impacto),
+            riesgo_social=(self.proyecto.riesgo_social_probabilidad, self.proyecto.riesgo_social_impacto),
+            riesgo_financiero=(self.proyecto.riesgo_financiero_probabilidad, self.proyecto.riesgo_financiero_impacto),
+            riesgo_regulatorio=(self.proyecto.riesgo_regulatorio_probabilidad, self.proyecto.riesgo_regulatorio_impacto),
+            score_tecnico=score_tecnico,
+            score_social=score_social,
+            score_financiero=score_financiero,
+            score_regulatorio=score_regulatorio,
+            score_total=self.resultado.score_riesgos,
+            contribucion=self.resultado.contribucion_riesgos
+        )
+
+    def _agregar_seccion_metodologia_word(self, doc) -> None:
+        """
+        Agrega sección de metodología Arquitectura C al documento Word.
+        """
+        if ExplicadorCriterios is None:
+            return
+
+        doc.add_heading('Metodología de Evaluación: Arquitectura C', 1)
+
+        metodologia = ExplicadorCriterios.generar_resumen_metodologia()
+
+        doc.add_paragraph(metodologia['descripcion'])
+        doc.add_paragraph()
+
+        doc.add_heading('Fórmula de Cálculo', 2)
+        doc.add_paragraph(metodologia['formula_general'])
+        doc.add_paragraph()
+
+        # Tabla de criterios
+        tabla = doc.add_table(rows=5, cols=3)
+        tabla.style = 'Light Grid Accent 1'
+
+        headers = tabla.rows[0].cells
+        headers[0].text = "Criterio"
+        headers[1].text = "Peso"
+        headers[2].text = "Descripción"
+
+        for i, criterio in enumerate(metodologia['criterios'], 1):
+            row = tabla.rows[i].cells
+            row[0].text = criterio['nombre']
+            row[1].text = criterio['peso']
+            row[2].text = criterio['descripcion']
+
+        doc.add_paragraph()
+
+        # Niveles de prioridad
+        doc.add_heading('Niveles de Prioridad', 2)
+
+        tabla_niveles = doc.add_table(rows=6, cols=3)
+        tabla_niveles.style = 'Light List Accent 1'
+
+        headers = tabla_niveles.rows[0].cells
+        headers[0].text = "Rango Score"
+        headers[1].text = "Nivel"
+        headers[2].text = "Recomendación"
+
+        for i, nivel in enumerate(metodologia['niveles_prioridad'], 1):
+            row = tabla_niveles.rows[i].cells
+            row[0].text = nivel['rango']
+            row[1].text = nivel['nivel']
+            row[2].text = nivel['recomendacion']
+
+    def _agregar_explicacion_criterio_word(self, doc, explicacion: Dict[str, Any]) -> None:
+        """
+        Agrega una explicación detallada de criterio al documento Word.
+        """
+        if 'error' in explicacion:
+            return
+
+        # Título y definición
+        doc.add_paragraph(f"Definición: {explicacion.get('definicion', '')}")
+        doc.add_paragraph()
+
+        # Valores y cálculo
+        if 'valor_input' in explicacion:
+            doc.add_paragraph(f"Valor de entrada: {explicacion['valor_input']}")
+
+        doc.add_paragraph(f"Score obtenido: {explicacion.get('score', 0):.1f}/100")
+
+        if 'formula_aplicada' in explicacion:
+            doc.add_paragraph(f"Fórmula aplicada: {explicacion['formula_aplicada']}")
+
+        if 'calculo_contribucion' in explicacion:
+            doc.add_paragraph(f"Cálculo: {explicacion['calculo_contribucion']}")
+
+        doc.add_paragraph()
+
+        # Interpretación
+        if 'interpretacion' in explicacion:
+            p = doc.add_paragraph()
+            p.add_run("Interpretación: ").bold = True
+            p.add_run(explicacion['interpretacion'])
+
+        # Recomendación si existe
+        if 'recomendacion' in explicacion:
+            p = doc.add_paragraph()
+            p.add_run("Recomendación: ").bold = True
+            p.add_run(explicacion['recomendacion'])
+
+        doc.add_paragraph()
+
+    def _agregar_explicacion_criterio_pdf(self, story, styles, explicacion: Dict[str, Any], titulo: str) -> None:
+        """
+        Agrega una explicación detallada de criterio al PDF.
+        """
+        if 'error' in explicacion:
+            return
+
+        heading_style = ParagraphStyle(
+            'CriterioHeading',
+            parent=styles['Heading3'],
+            fontSize=12,
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=8
+        )
+
+        story.append(Paragraph(titulo, heading_style))
+
+        # Definición
+        if 'definicion' in explicacion:
+            story.append(Paragraph(f"<b>Definición:</b> {explicacion['definicion']}", styles['Normal']))
+            story.append(Spacer(1, 0.1*inch))
+
+        # Valores y cálculo
+        if 'valor_input' in explicacion:
+            story.append(Paragraph(f"<b>Valor de entrada:</b> {explicacion['valor_input']}", styles['Normal']))
+
+        story.append(Paragraph(f"<b>Score obtenido:</b> {explicacion.get('score', 0):.1f}/100", styles['Normal']))
+
+        if 'formula_aplicada' in explicacion:
+            story.append(Paragraph(f"<b>Fórmula:</b> {explicacion['formula_aplicada']}", styles['Normal']))
+
+        if 'calculo_contribucion' in explicacion:
+            story.append(Paragraph(f"<b>Cálculo:</b> {explicacion['calculo_contribucion']}", styles['Normal']))
+
+        story.append(Spacer(1, 0.1*inch))
+
+        # Interpretación
+        if 'interpretacion' in explicacion:
+            story.append(Paragraph(f"<b>Interpretación:</b> {explicacion['interpretacion']}", styles['Normal']))
+
+        # Recomendación
+        if 'recomendacion' in explicacion:
+            story.append(Paragraph(f"<b>Recomendación:</b> {explicacion['recomendacion']}", styles['Normal']))
+
+        story.append(Spacer(1, 0.15*inch))
+
+    def _agregar_seccion_metodologia_pdf(self, story, styles) -> None:
+        """
+        Agrega sección de metodología al PDF.
+        """
+        if ExplicadorCriterios is None:
+            return
+
+        heading_style = ParagraphStyle(
+            'MetodologiaHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#1f77b4'),
+            spaceAfter=12
+        )
+
+        story.append(Paragraph("Metodología de Evaluación: Arquitectura C", heading_style))
+
+        metodologia = ExplicadorCriterios.generar_resumen_metodologia()
+
+        story.append(Paragraph(metodologia['descripcion'], styles['Normal']))
+        story.append(Spacer(1, 0.1*inch))
+
+        story.append(Paragraph("<b>Fórmula General:</b>", styles['Normal']))
+        story.append(Paragraph(metodologia['formula_general'], styles['Normal']))
+        story.append(Spacer(1, 0.15*inch))
+
+        # Tabla de criterios
+        criterios_met = [['Criterio', 'Peso', 'Descripción']]
+        for criterio in metodologia['criterios']:
+            criterios_met.append([criterio['nombre'], criterio['peso'], criterio['descripcion']])
+
+        criterios_table = Table(criterios_met, colWidths=[2*inch, 0.8*inch, 3.5*inch])
+        criterios_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f2f6')])
+        ]))
+
+        story.append(criterios_table)
+        story.append(Spacer(1, 0.2*inch))
+
+        # Niveles de prioridad
+        story.append(Paragraph("<b>Niveles de Prioridad:</b>", styles['Normal']))
+        story.append(Spacer(1, 0.05*inch))
+
+        niveles_data = [['Rango', 'Nivel', 'Recomendación']]
+        for nivel in metodologia['niveles_prioridad']:
+            niveles_data.append([nivel['rango'], nivel['nivel'], nivel['recomendacion']])
+
+        niveles_table = Table(niveles_data, colWidths=[1.5*inch, 1.5*inch, 3.3*inch])
+        niveles_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f2f6')])
+        ]))
+
+        story.append(niveles_table)
+
     def exportar_word(self) -> bytes:
         """
         Exporta a Word con formato ejecutivo profesional.
-        
+
         Returns:
             bytes: Contenido del archivo Word
         """
@@ -477,38 +818,187 @@ Perfil de Riesgo General: {riesgo_total:.1f}/25
         doc.add_paragraph(f"Score: {self.resultado.score_riesgos:.0f}/100")
         
         doc.add_page_break()
-        
-        # ========== ANÁLISIS PROFUNDO ARQUITECTURA C ==========
-        doc.add_heading('Análisis Profundo según Arquitectura C', 1)
-        
-        # Análisis SROI
-        doc.add_heading('Análisis de Retorno Social (SROI)', 2)
-        analisis_sroi = self._generar_analisis_sroi()
-        for linea in analisis_sroi.split('\n'):
-            if linea.strip():
-                doc.add_paragraph(linea)
-        
-        # Análisis Stakeholders
-        doc.add_heading('Análisis de Impacto en Stakeholders', 2)
-        analisis_stakeholders = self._generar_analisis_stakeholders()
-        for linea in analisis_stakeholders.split('\n'):
-            if linea.strip():
-                doc.add_paragraph(linea)
-        
-        # Análisis PDET
-        if self.proyecto.tiene_municipios_pdet or True:  # Siempre mostrar
-            doc.add_heading('Análisis de Elegibilidad PDET', 2)
+
+        # ========== METODOLOGÍA ARQUITECTURA C ==========
+        self._agregar_seccion_metodologia_word(doc)
+
+        doc.add_page_break()
+
+        # ========== ANÁLISIS DETALLADO POR CRITERIO ==========
+        doc.add_heading('Análisis Detallado por Criterio', 1)
+        doc.add_paragraph(
+            "A continuación se presenta el análisis detallado de cada criterio, "
+            "incluyendo los valores de entrada, las fórmulas aplicadas, y la interpretación "
+            "de los resultados. Esto permite al Comité Evaluador comprender exactamente "
+            "cómo se calculó cada componente del score final."
+        )
+        doc.add_paragraph()
+
+        # ========== 1. SROI (40%) ==========
+        doc.add_heading('1. Retorno Social de la Inversión (SROI) - Peso: 40%', 2)
+        explicacion_sroi = self._generar_explicacion_detallada_sroi()
+        if 'error' not in explicacion_sroi:
+            self._agregar_explicacion_criterio_word(doc, explicacion_sroi)
+
+            # Añadir escala de conversión
+            if 'escala_conversion' in explicacion_sroi:
+                doc.add_heading('Escala de Conversión SROI → Score', 3)
+                tabla_sroi = doc.add_table(rows=5, cols=3)
+                tabla_sroi.style = 'Light List Accent 1'
+
+                headers = tabla_sroi.rows[0].cells
+                headers[0].text = "Rango SROI"
+                headers[1].text = "Score"
+                headers[2].text = "Nivel"
+
+                for i, escala in enumerate(explicacion_sroi['escala_conversion'], 1):
+                    row = tabla_sroi.rows[i].cells
+                    row[0].text = escala['rango']
+                    row[1].text = str(escala['score'])
+                    row[2].text = escala['nivel']
+
+                doc.add_paragraph()
+        else:
+            # Fallback al análisis anterior
+            analisis_sroi = self._generar_analisis_sroi()
+            for linea in analisis_sroi.split('\n'):
+                if linea.strip():
+                    doc.add_paragraph(linea)
+
+        # ========== 2. STAKEHOLDERS (25%) ==========
+        doc.add_heading('2. Stakeholders y Pertinencia Operacional - Peso: 25%', 2)
+        explicacion_stak = self._generar_explicacion_detallada_stakeholders()
+        if 'error' not in explicacion_stak:
+            self._agregar_explicacion_criterio_word(doc, explicacion_stak)
+
+            # Desglose de componentes
+            if 'componentes' in explicacion_stak:
+                doc.add_heading('Desglose de Componentes', 3)
+                tabla_stak = doc.add_table(rows=5, cols=4)
+                tabla_stak.style = 'Light List Accent 1'
+
+                headers = tabla_stak.rows[0].cells
+                headers[0].text = "Componente"
+                headers[1].text = "Peso"
+                headers[2].text = "Score"
+                headers[3].text = "Contribución"
+
+                for i, comp in enumerate(explicacion_stak['componentes'], 1):
+                    row = tabla_stak.rows[i].cells
+                    row[0].text = comp['nombre']
+                    row[1].text = comp['peso']
+                    row[2].text = f"{comp['score']:.1f}"
+                    row[3].text = f"{comp['contribucion_parcial']:.2f}"
+
+                doc.add_paragraph()
+        else:
+            analisis_stakeholders = self._generar_analisis_stakeholders()
+            for linea in analisis_stakeholders.split('\n'):
+                if linea.strip():
+                    doc.add_paragraph(linea)
+
+        # ========== 3. PROBABILIDAD PDET (20%) ==========
+        doc.add_heading('3. Probabilidad de Aprobación (PDET) - Peso: 20%', 2)
+        explicacion_prob = self._generar_explicacion_detallada_probabilidad()
+        if 'error' not in explicacion_prob:
+            self._agregar_explicacion_criterio_word(doc, explicacion_prob)
+
+            # Info adicional PDET
+            if 'info_pdet' in explicacion_prob:
+                doc.add_heading('Información PDET', 3)
+                info = explicacion_prob['info_pdet']
+                doc.add_paragraph(f"Municipio: {info.get('municipio', 'N/A')}")
+                doc.add_paragraph(f"Departamento: {info.get('departamento', 'N/A')}")
+                doc.add_paragraph(f"Estado PDET: {'Sí' if info.get('es_pdet') else 'No'}")
+                if info.get('sector'):
+                    doc.add_paragraph(f"Sector: {info['sector']}")
+                doc.add_paragraph()
+        else:
             analisis_pdet = self._generar_analisis_pdet()
             for linea in analisis_pdet.split('\n'):
                 if linea.strip():
                     doc.add_paragraph(linea)
-        
-        # Análisis Riesgos
-        doc.add_heading('Análisis de Riesgos y Mitigación', 2)
-        analisis_riesgos = self._generar_analisis_riesgos()
-        for linea in analisis_riesgos.split('\n'):
-            if linea.strip():
-                doc.add_paragraph(linea)
+
+        # ========== 4. RIESGOS (15%) ==========
+        doc.add_heading('4. Evaluación de Riesgos - Peso: 15%', 2)
+        explicacion_riesg = self._generar_explicacion_detallada_riesgos()
+        if 'error' not in explicacion_riesg:
+            self._agregar_explicacion_criterio_word(doc, explicacion_riesg)
+
+            # Matriz de riesgos
+            if 'matriz_riesgos' in explicacion_riesg:
+                doc.add_heading('Matriz de Riesgos Detallada', 3)
+                tabla_riesg = doc.add_table(rows=5, cols=5)
+                tabla_riesg.style = 'Light List Accent 1'
+
+                headers = tabla_riesg.rows[0].cells
+                headers[0].text = "Tipo de Riesgo"
+                headers[1].text = "Prob."
+                headers[2].text = "Impacto"
+                headers[3].text = "Severidad"
+                headers[4].text = "Score"
+
+                for i, riesgo in enumerate(explicacion_riesg['matriz_riesgos'], 1):
+                    row = tabla_riesg.rows[i].cells
+                    row[0].text = riesgo['tipo']
+                    row[1].text = str(riesgo['probabilidad'])
+                    row[2].text = str(riesgo['impacto'])
+                    row[3].text = str(riesgo['severidad'])
+                    row[4].text = f"{riesgo['score']:.1f}"
+
+                doc.add_paragraph()
+                doc.add_paragraph(
+                    "Nota: Score de riesgo es INVERSO (menor severidad = mayor score). "
+                    "Fórmula: Score = 100 - (Severidad × 4)"
+                )
+        else:
+            analisis_riesgos = self._generar_analisis_riesgos()
+            for linea in analisis_riesgos.split('\n'):
+                if linea.strip():
+                    doc.add_paragraph(linea)
+
+        # ========== RESUMEN DE CÁLCULO FINAL ==========
+        doc.add_page_break()
+        doc.add_heading('Resumen de Cálculo del Score Final', 1)
+
+        doc.add_paragraph(
+            "El score final se calcula como la suma ponderada de los scores de cada criterio:"
+        )
+        doc.add_paragraph()
+
+        # Tabla resumen final
+        tabla_final = doc.add_table(rows=6, cols=4)
+        tabla_final.style = 'Medium Grid 1 Accent 1'
+
+        headers = tabla_final.rows[0].cells
+        headers[0].text = "Criterio"
+        headers[1].text = "Peso"
+        headers[2].text = "Score"
+        headers[3].text = "Contribución"
+
+        criterios_data = [
+            ("SROI", "40%", self.resultado.score_sroi, self.resultado.contribucion_sroi),
+            ("Stakeholders", "25%", self.resultado.score_stakeholders, self.resultado.contribucion_stakeholders),
+            ("Probabilidad", "20%", self.resultado.score_probabilidad, self.resultado.contribucion_probabilidad),
+            ("Riesgos", "15%", self.resultado.score_riesgos, self.resultado.contribucion_riesgos),
+            ("TOTAL", "100%", "-", self.resultado.score_total)
+        ]
+
+        for i, (nombre, peso, score, contrib) in enumerate(criterios_data, 1):
+            row = tabla_final.rows[i].cells
+            row[0].text = nombre
+            row[1].text = peso
+            row[2].text = f"{score:.1f}" if isinstance(score, (int, float)) else str(score)
+            row[3].text = f"{contrib:.2f}"
+
+        doc.add_paragraph()
+        doc.add_paragraph(
+            f"Score Final = {self.resultado.contribucion_sroi:.2f} + "
+            f"{self.resultado.contribucion_stakeholders:.2f} + "
+            f"{self.resultado.contribucion_probabilidad:.2f} + "
+            f"{self.resultado.contribucion_riesgos:.2f} = "
+            f"{self.resultado.score_total:.2f}"
+        )
         
         # Conclusiones y Recomendaciones Finales
         doc.add_page_break()
@@ -674,7 +1164,249 @@ Perfil de Riesgo General: {riesgo_total:.1f}/25
             if alertas_recs:
                 df_alertas = pd.DataFrame(alertas_recs)
                 df_alertas.to_excel(writer, sheet_name='Alertas y Recomendaciones', index=False)
-        
+
+            # ========== HOJA 5: METODOLOGÍA ==========
+            if ExplicadorCriterios is not None:
+                metodologia = ExplicadorCriterios.generar_resumen_metodologia()
+
+                metodologia_data = {
+                    'Aspecto': [
+                        'Sistema',
+                        'Descripción',
+                        '',
+                        'Fórmula General',
+                        '',
+                        'CRITERIOS',
+                    ],
+                    'Detalle': [
+                        'Arquitectura C - Motor de Priorización',
+                        metodologia['descripcion'],
+                        '',
+                        metodologia['formula_general'],
+                        '',
+                        '',
+                    ]
+                }
+
+                # Agregar criterios
+                for criterio in metodologia['criterios']:
+                    metodologia_data['Aspecto'].append(f"  {criterio['nombre']}")
+                    metodologia_data['Detalle'].append(f"{criterio['peso']} - {criterio['descripcion']}")
+
+                metodologia_data['Aspecto'].append('')
+                metodologia_data['Detalle'].append('')
+                metodologia_data['Aspecto'].append('NIVELES DE PRIORIDAD')
+                metodologia_data['Detalle'].append('')
+
+                for nivel in metodologia['niveles_prioridad']:
+                    metodologia_data['Aspecto'].append(f"  {nivel['rango']}")
+                    metodologia_data['Detalle'].append(f"{nivel['nivel']} - {nivel['recomendacion']}")
+
+                df_metodologia = pd.DataFrame(metodologia_data)
+                df_metodologia.to_excel(writer, sheet_name='Metodología', index=False)
+
+            # ========== HOJA 6: EXPLICACIÓN SROI ==========
+            explicacion_sroi = self._generar_explicacion_detallada_sroi()
+            if 'error' not in explicacion_sroi:
+                sroi_data = {
+                    'Campo': [
+                        'Criterio',
+                        'Peso',
+                        'Definición',
+                        '',
+                        'Valor SROI Ingresado',
+                        'Score Obtenido',
+                        'Contribución al Total',
+                        '',
+                        'Fórmula Aplicada',
+                        'Interpretación',
+                        '',
+                        'ESCALA DE CONVERSIÓN',
+                        '< 1.0',
+                        '1.0 - 1.99',
+                        '2.0 - 2.99',
+                        '≥ 3.0'
+                    ],
+                    'Valor': [
+                        'SROI - Retorno Social de la Inversión',
+                        '40%',
+                        explicacion_sroi.get('definicion', ''),
+                        '',
+                        str(explicacion_sroi.get('valor_input', '')),
+                        f"{explicacion_sroi.get('score', 0):.1f}/100",
+                        explicacion_sroi.get('calculo_contribucion', ''),
+                        '',
+                        explicacion_sroi.get('formula_aplicada', ''),
+                        explicacion_sroi.get('interpretacion', ''),
+                        '',
+                        '',
+                        'Score: 0 (RECHAZAR)',
+                        'Score: 60 (Prioridad Baja)',
+                        'Score: 80 (Prioridad Media)',
+                        'Score: 95 (Prioridad Alta)'
+                    ]
+                }
+                df_sroi = pd.DataFrame(sroi_data)
+                df_sroi.to_excel(writer, sheet_name='Explicación SROI', index=False)
+
+            # ========== HOJA 7: EXPLICACIÓN STAKEHOLDERS ==========
+            explicacion_stak = self._generar_explicacion_detallada_stakeholders()
+            if 'error' not in explicacion_stak:
+                stak_data = {
+                    'Campo': [
+                        'Criterio',
+                        'Peso Total',
+                        'Definición',
+                        '',
+                        'Score Obtenido',
+                        'Contribución al Total',
+                        '',
+                        'COMPONENTES',
+                    ],
+                    'Valor': [
+                        'Stakeholders (Relacionamiento y Pertinencia)',
+                        '25%',
+                        explicacion_stak.get('definicion', ''),
+                        '',
+                        f"{explicacion_stak.get('score', 0):.1f}/100",
+                        explicacion_stak.get('calculo_contribucion', ''),
+                        '',
+                        '',
+                    ]
+                }
+
+                if 'componentes' in explicacion_stak:
+                    for comp in explicacion_stak['componentes']:
+                        stak_data['Campo'].append(f"  {comp['nombre']} ({comp['peso']})")
+                        stak_data['Valor'].append(f"Score: {comp['score']:.1f} → Contrib: {comp['contribucion_parcial']:.2f}")
+
+                stak_data['Campo'].append('')
+                stak_data['Valor'].append('')
+                stak_data['Campo'].append('Interpretación')
+                stak_data['Valor'].append(explicacion_stak.get('interpretacion', ''))
+
+                df_stak = pd.DataFrame(stak_data)
+                df_stak.to_excel(writer, sheet_name='Explicación Stakeholders', index=False)
+
+            # ========== HOJA 8: EXPLICACIÓN PROBABILIDAD ==========
+            explicacion_prob = self._generar_explicacion_detallada_probabilidad()
+            if 'error' not in explicacion_prob:
+                prob_data = {
+                    'Campo': [
+                        'Criterio',
+                        'Peso',
+                        'Definición',
+                        '',
+                        'Score Obtenido',
+                        'Contribución al Total',
+                        '',
+                        'INFORMACIÓN PDET',
+                        'Municipio',
+                        'Departamento',
+                        'Es PDET',
+                        'Sector',
+                        '',
+                        'Interpretación'
+                    ],
+                    'Valor': [
+                        'Probabilidad de Aprobación (PDET)',
+                        '20%',
+                        explicacion_prob.get('definicion', ''),
+                        '',
+                        f"{explicacion_prob.get('score', 0):.1f}/100",
+                        explicacion_prob.get('calculo_contribucion', ''),
+                        '',
+                        '',
+                        explicacion_prob.get('info_pdet', {}).get('municipio', 'N/A') if 'info_pdet' in explicacion_prob else 'N/A',
+                        explicacion_prob.get('info_pdet', {}).get('departamento', 'N/A') if 'info_pdet' in explicacion_prob else 'N/A',
+                        'Sí' if explicacion_prob.get('info_pdet', {}).get('es_pdet', False) else 'No',
+                        explicacion_prob.get('info_pdet', {}).get('sector', 'N/A') if 'info_pdet' in explicacion_prob else 'N/A',
+                        '',
+                        explicacion_prob.get('interpretacion', '')
+                    ]
+                }
+                df_prob = pd.DataFrame(prob_data)
+                df_prob.to_excel(writer, sheet_name='Explicación Probabilidad', index=False)
+
+            # ========== HOJA 9: EXPLICACIÓN RIESGOS ==========
+            explicacion_riesg = self._generar_explicacion_detallada_riesgos()
+            if 'error' not in explicacion_riesg:
+                riesg_data = {
+                    'Campo': [
+                        'Criterio',
+                        'Peso',
+                        'Definición',
+                        '',
+                        'Score Obtenido',
+                        'Contribución al Total',
+                        '',
+                        'Fórmula',
+                        '',
+                        'MATRIZ DE RIESGOS',
+                    ],
+                    'Valor': [
+                        'Evaluación de Riesgos',
+                        '15%',
+                        explicacion_riesg.get('definicion', ''),
+                        '',
+                        f"{explicacion_riesg.get('score', 0):.1f}/100",
+                        explicacion_riesg.get('calculo_contribucion', ''),
+                        '',
+                        'Score = 100 - (Probabilidad × Impacto × 4)',
+                        '',
+                        'Tipo | Prob | Impacto | Severidad | Score',
+                    ]
+                }
+
+                if 'matriz_riesgos' in explicacion_riesg:
+                    for r in explicacion_riesg['matriz_riesgos']:
+                        riesg_data['Campo'].append(f"  {r['tipo']}")
+                        riesg_data['Valor'].append(f"{r['probabilidad']} × {r['impacto']} = {r['severidad']} → Score: {r['score']:.1f}")
+
+                riesg_data['Campo'].append('')
+                riesg_data['Valor'].append('')
+                riesg_data['Campo'].append('Interpretación')
+                riesg_data['Valor'].append(explicacion_riesg.get('interpretacion', ''))
+                riesg_data['Campo'].append('')
+                riesg_data['Valor'].append('')
+                riesg_data['Campo'].append('Nota')
+                riesg_data['Valor'].append('Score INVERSO: Menor severidad = Mayor score')
+
+                df_riesg = pd.DataFrame(riesg_data)
+                df_riesg.to_excel(writer, sheet_name='Explicación Riesgos', index=False)
+
+            # ========== HOJA 10: CÁLCULO FINAL ==========
+            calculo_final = {
+                'Criterio': ['SROI', 'Stakeholders', 'Probabilidad', 'Riesgos', '', 'TOTAL'],
+                'Peso': ['40%', '25%', '20%', '15%', '', '100%'],
+                'Score (0-100)': [
+                    f"{self.resultado.score_sroi:.1f}",
+                    f"{self.resultado.score_stakeholders:.1f}",
+                    f"{self.resultado.score_probabilidad:.1f}",
+                    f"{self.resultado.score_riesgos:.1f}",
+                    '',
+                    '-'
+                ],
+                'Cálculo': [
+                    f"{self.resultado.score_sroi:.1f} × 0.40",
+                    f"{self.resultado.score_stakeholders:.1f} × 0.25",
+                    f"{self.resultado.score_probabilidad:.1f} × 0.20",
+                    f"{self.resultado.score_riesgos:.1f} × 0.15",
+                    '',
+                    f"{self.resultado.contribucion_sroi:.2f} + {self.resultado.contribucion_stakeholders:.2f} + {self.resultado.contribucion_probabilidad:.2f} + {self.resultado.contribucion_riesgos:.2f}"
+                ],
+                'Contribución': [
+                    f"{self.resultado.contribucion_sroi:.2f}",
+                    f"{self.resultado.contribucion_stakeholders:.2f}",
+                    f"{self.resultado.contribucion_probabilidad:.2f}",
+                    f"{self.resultado.contribucion_riesgos:.2f}",
+                    '',
+                    f"{self.resultado.score_total:.2f}"
+                ]
+            }
+            df_calculo = pd.DataFrame(calculo_final)
+            df_calculo.to_excel(writer, sheet_name='Cálculo Final', index=False)
+
         output.seek(0)
         return output.getvalue()
     
@@ -849,11 +1581,153 @@ Perfil de Riesgo General: {riesgo_total:.1f}/25
             for rec in self.resultado.recomendaciones:
                 story.append(Paragraph(f"• {rec}", styles['Normal']))
                 story.append(Spacer(1, 0.05*inch))
-        
+
+        # ========== METODOLOGÍA Y EXPLICACIONES DETALLADAS ==========
+        story.append(PageBreak())
+
+        # Sección de Metodología
+        self._agregar_seccion_metodologia_pdf(story, styles)
+
+        story.append(PageBreak())
+
+        # Análisis Detallado por Criterio
+        detail_heading = ParagraphStyle(
+            'DetailHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=colors.HexColor('#1f77b4'),
+            spaceAfter=12
+        )
+
+        story.append(Paragraph("Análisis Detallado por Criterio", detail_heading))
+        story.append(Paragraph(
+            "A continuación se presenta el desglose de cada criterio con las fórmulas "
+            "aplicadas y la interpretación de los resultados.",
+            styles['Normal']
+        ))
+        story.append(Spacer(1, 0.2*inch))
+
+        # 1. SROI
+        explicacion_sroi = self._generar_explicacion_detallada_sroi()
+        self._agregar_explicacion_criterio_pdf(story, styles, explicacion_sroi, "1. SROI - Retorno Social (Peso: 40%)")
+
+        # Tabla de escala SROI
+        if 'escala_conversion' in explicacion_sroi:
+            sroi_escala = [['Rango SROI', 'Score', 'Nivel']]
+            for e in explicacion_sroi['escala_conversion']:
+                sroi_escala.append([e['rango'], str(e['score']), e['nivel']])
+
+            sroi_table = Table(sroi_escala, colWidths=[2*inch, 1.5*inch, 2*inch])
+            sroi_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+            ]))
+            story.append(sroi_table)
+            story.append(Spacer(1, 0.2*inch))
+
+        # 2. Stakeholders
+        explicacion_stak = self._generar_explicacion_detallada_stakeholders()
+        self._agregar_explicacion_criterio_pdf(story, styles, explicacion_stak, "2. Stakeholders (Peso: 25%)")
+
+        # Tabla de componentes Stakeholders
+        if 'componentes' in explicacion_stak:
+            stak_comp = [['Componente', 'Peso', 'Score', 'Contribución']]
+            for c in explicacion_stak['componentes']:
+                stak_comp.append([c['nombre'], c['peso'], f"{c['score']:.1f}", f"{c['contribucion_parcial']:.2f}"])
+
+            stak_table = Table(stak_comp, colWidths=[2.5*inch, 1*inch, 1.2*inch, 1.5*inch])
+            stak_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+            ]))
+            story.append(stak_table)
+            story.append(Spacer(1, 0.2*inch))
+
+        # 3. Probabilidad PDET
+        explicacion_prob = self._generar_explicacion_detallada_probabilidad()
+        self._agregar_explicacion_criterio_pdf(story, styles, explicacion_prob, "3. Probabilidad PDET (Peso: 20%)")
+
+        story.append(PageBreak())
+
+        # 4. Riesgos
+        explicacion_riesg = self._generar_explicacion_detallada_riesgos()
+        self._agregar_explicacion_criterio_pdf(story, styles, explicacion_riesg, "4. Riesgos (Peso: 15%)")
+
+        # Matriz de Riesgos
+        if 'matriz_riesgos' in explicacion_riesg:
+            riesg_data = [['Tipo', 'Prob.', 'Impacto', 'Severidad', 'Score']]
+            for r in explicacion_riesg['matriz_riesgos']:
+                riesg_data.append([r['tipo'], str(r['probabilidad']), str(r['impacto']), str(r['severidad']), f"{r['score']:.1f}"])
+
+            riesg_table = Table(riesg_data, colWidths=[2*inch, 1*inch, 1*inch, 1.2*inch, 1*inch])
+            riesg_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+            ]))
+            story.append(riesg_table)
+            story.append(Spacer(1, 0.1*inch))
+            story.append(Paragraph(
+                "<i>Nota: Score de riesgo es INVERSO. Fórmula: Score = 100 - (Severidad × 4)</i>",
+                styles['Normal']
+            ))
+            story.append(Spacer(1, 0.2*inch))
+
+        # ========== RESUMEN FINAL DE CÁLCULO ==========
+        story.append(Paragraph("Resumen de Cálculo del Score Final", detail_heading))
+        story.append(Spacer(1, 0.1*inch))
+
+        # Tabla resumen
+        resumen_final = [
+            ['Criterio', 'Peso', 'Score', 'Contribución'],
+            ['SROI', '40%', f"{self.resultado.score_sroi:.1f}", f"{self.resultado.contribucion_sroi:.2f}"],
+            ['Stakeholders', '25%', f"{self.resultado.score_stakeholders:.1f}", f"{self.resultado.contribucion_stakeholders:.2f}"],
+            ['Probabilidad', '20%', f"{self.resultado.score_probabilidad:.1f}", f"{self.resultado.contribucion_probabilidad:.2f}"],
+            ['Riesgos', '15%', f"{self.resultado.score_riesgos:.1f}", f"{self.resultado.contribucion_riesgos:.2f}"],
+            ['TOTAL', '100%', '-', f"{self.resultado.score_total:.2f}"]
+        ]
+
+        resumen_table = Table(resumen_final, colWidths=[2*inch, 1.2*inch, 1.5*inch, 1.5*inch])
+        resumen_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#22c55e') if self.resultado.score_total >= 70 else colors.HexColor('#eab308')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey)
+        ]))
+
+        story.append(resumen_table)
+        story.append(Spacer(1, 0.15*inch))
+
+        story.append(Paragraph(
+            f"<b>Score Final</b> = {self.resultado.contribucion_sroi:.2f} + "
+            f"{self.resultado.contribucion_stakeholders:.2f} + "
+            f"{self.resultado.contribucion_probabilidad:.2f} + "
+            f"{self.resultado.contribucion_riesgos:.2f} = "
+            f"<b>{self.resultado.score_total:.2f}</b>",
+            styles['Normal']
+        ))
+
         # Construir PDF
         doc.build(story)
         buffer.seek(0)
-        
+
         return buffer.getvalue()
     
     def exportar_resumen_ejecutivo(self) -> bytes:

@@ -1,5 +1,6 @@
 """
 Aplicación Web para Sistema de Priorización de Proyectos Sociales.
+Sistema ENLAZA GEB - Arquitectura C
 Usando Streamlit para interface gráfica.
 
 Ejecutar con: streamlit run app.py
@@ -21,10 +22,17 @@ from app_pages import home, nuevo_proyecto, buscar_proyectos, evaluar_cartera, d
 # Importar gestor de base de datos
 from database.db_manager import get_db_manager
 
+# Importar estilos UI ejecutivos
+try:
+    from ui.estilos import EstilosUI
+    UI_DISPONIBLE = True
+except ImportError:
+    UI_DISPONIBLE = False
+
 # Configuración de la página
 st.set_page_config(
-    page_title="Sistema de Priorización de Proyectos | Valor Compartido",
-    page_icon="🎯",
+    page_title="ENLAZA GEB | Sistema de Priorización",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -36,15 +44,10 @@ def load_css():
     if css_file.exists():
         with open(css_file) as f:
             st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-    else:
-        # Fallback CSS básico si no existe el archivo
-        st.markdown("""
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-            * { font-family: 'Inter', sans-serif; }
-            .main { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
-        </style>
-        """, unsafe_allow_html=True)
+
+    # Aplicar estilos ejecutivos adicionales
+    if UI_DISPONIBLE:
+        EstilosUI.aplicar_estilos_ejecutivos()
 
 load_css()
 
@@ -81,36 +84,62 @@ if 'gestor_historial' not in st.session_state:
     from servicios.gestor_historial import GestorHistorial
     st.session_state.gestor_historial = GestorHistorial()
 
-# Sidebar - Menú de navegación
+# Sidebar - Menú de navegación ejecutivo
 with st.sidebar:
-    # Logo del sistema
-    logo_path = Path(__file__).parent / "static" / "images" / "logo_sistema.png"
-    if logo_path.exists():
-        st.image(str(logo_path), width=80)
-    
-    st.markdown('<h2 class="text-gradient-primary" style="text-align: center; margin: 0.5rem 0;">Sistema de Priorización</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1rem;">Proyectos de Valor Compartido</p>', unsafe_allow_html=True)
-    st.markdown("---")
+    # Header del sidebar con logo
+    st.markdown("""
+    <div class="sidebar-logo-container">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚡</div>
+        <h2 class="sidebar-titulo">ENLAZA GEB</h2>
+        <p class="sidebar-subtitulo">Sistema de Priorización</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Navegación principal
+    st.markdown('<p style="color: #64748b; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; padding: 0 1rem; margin-bottom: 0.5rem;">Navegación Principal</p>', unsafe_allow_html=True)
 
     menu_option = st.radio(
         "Navegación:",
-        ["🏠 Inicio", "➕ Nuevo Proyecto", "🔍 Buscar y Editar",
-         "📊 Evaluar Cartera", "🧪 Test Motor", "📚 Historial", "🤖 Asistente IA",
-         "📖 Historial IA", "📈 Dashboard", "⚙️ Configuración"],
+        ["📈 Dashboard", "📊 Evaluar Cartera", "➕ Nuevo Proyecto", "🔍 Buscar y Editar",
+         "🧪 Test Motor", "📚 Historial", "🤖 Asistente IA",
+         "📖 Historial IA", "🏠 Inicio", "⚙️ Configuración"],
         label_visibility="collapsed"
     )
 
     st.markdown("---")
-    
-    # Métricas del sidebar con diseño mejorado
-    st.markdown('<div class="glass-card" style="padding: 1rem; margin: 1rem 0;">', unsafe_allow_html=True)
-    st.markdown(f'<p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">PROYECTOS REGISTRADOS</p>', unsafe_allow_html=True)
-    st.markdown(f'<h3 class="text-gradient-primary" style="margin: 0.25rem 0;">{len(st.session_state.proyectos)}</h3>', unsafe_allow_html=True)
-    
+
+    # Métricas del sidebar con diseño ejecutivo
+    st.markdown("""
+    <div style="background: linear-gradient(145deg, rgba(14, 165, 233, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
+         border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 0.75rem;
+         padding: 1rem; margin: 0.5rem;">
+        <p style="font-size: 0.65rem; color: #64748b; margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">
+            Proyectos en Cartera
+        </p>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+        <h3 style="font-size: 2rem; font-weight: 700; margin: 0.25rem 0;
+             background: linear-gradient(135deg, #0ea5e9 0%, #10b981 100%);
+             -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            {len(st.session_state.proyectos)}
+        </h3>
+    """, unsafe_allow_html=True)
+
     if len(st.session_state.proyectos) > 0:
         ultimo = st.session_state.proyectos[-1]
-        st.markdown(f'<p style="font-size: 0.75rem; color: #cbd5e1; margin-top: 0.5rem;">Último: {ultimo.nombre[:25]}...</p>', unsafe_allow_html=True)
+        nombre_corto = ultimo.nombre[:22] + "..." if len(ultimo.nombre) > 22 else ultimo.nombre
+        st.markdown(f'<p style="font-size: 0.7rem; color: #94a3b8; margin: 0.5rem 0 0 0;">Último: {nombre_corto}</p>', unsafe_allow_html=True)
+
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # Versión del sistema
+    st.markdown("""
+    <div style="text-align: center; padding: 1rem 0; margin-top: 1rem;">
+        <p style="color: #475569; font-size: 0.65rem; margin: 0;">Arquitectura C v2.0</p>
+        <p style="color: #334155; font-size: 0.6rem; margin: 0.25rem 0 0 0;">Valor Compartido</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Routing a las diferentes páginas
 if menu_option == "🏠 Inicio":
@@ -134,18 +163,10 @@ elif menu_option == "📈 Dashboard":
 elif menu_option == "⚙️ Configuración":
     configuracion.show()
 
-# Footer
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; padding: 2rem 0 1rem 0;'>
-        <p class='text-gradient-primary' style='font-weight: 600; font-size: 1rem; margin: 0;'>
-            Sistema de Priorización de Proyectos Sociales
-        </p>
-        <p style='color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;'>
-            Valor Compartido • Desarrollado siguiendo Principios SOLID
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+# Footer ejecutivo
+st.markdown("""
+<div class="footer-ejecutivo">
+    <div class="footer-titulo">Sistema de Priorización ENLAZA GEB</div>
+    <div class="footer-subtitulo">Valor Compartido | Arquitectura C | Principios SOLID</div>
+</div>
+""", unsafe_allow_html=True)

@@ -1,0 +1,22 @@
+# ==============================================
+# Sistema de Priorización ENLAZA GEB
+# Configuración de Tema Corporativo Ejecutivo
+# ==============================================
+
+[theme]
+# Paleta de colores corporativa ejecutiva
+primaryColor = "#0ea5e9"          # Azul corporativo principal
+backgroundColor = "#0f172a"       # Fondo oscuro profesional
+secondaryBackgroundColor = "#1e293b"  # Fondo secundario
+textColor = "#f8fafc"             # Texto claro
+font = "sans serif"
+
+[server]
+headless = true
+enableXsrfProtection = false
+
+[browser]
+gatherUsageStats = false
+
+[runner]
+fastReruns = true
