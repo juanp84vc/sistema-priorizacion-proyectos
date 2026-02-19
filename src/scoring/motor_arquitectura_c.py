@@ -50,7 +50,7 @@ class ResultadoScoring:
     contribucion_riesgos: float  # score × 0.15
 
     # Nivel de prioridad
-    nivel_prioridad: str  # "MUY ALTA", "ALTA", "MEDIA", "BAJA", "RECHAZADO"
+    nivel_prioridad: str  # "MUY ALTA", "ALTA", "MEDIA", "BAJA", "RECHAZADO", "NO ELEGIBLE"
 
     # Metadata
     fecha_calculo: datetime = field(default_factory=datetime.now)
@@ -123,6 +123,32 @@ class MotorScoringArquitecturaC:
         alertas = []
         recomendaciones = []
 
+        # ========== GATE DE ELEGIBILIDAD PDET/ZOMAC (Ajuste CONFIS Feb 2026) ==========
+        if not proyecto.es_elegible_oxi:
+            alertas.append(
+                "🚫 PROYECTO NO ELEGIBLE - Obras por Impuestos solo aplica "
+                "para municipios PDET y/o ZOMAC"
+            )
+            return ResultadoScoring(
+                score_total=0,
+                score_sroi=0,
+                score_stakeholders=0,
+                score_probabilidad=0,
+                score_riesgos=0,
+                contribucion_sroi=0,
+                contribucion_stakeholders=0,
+                contribucion_probabilidad=0,
+                contribucion_riesgos=0,
+                nivel_prioridad="NO ELEGIBLE",
+                fecha_calculo=datetime.now(),
+                version_arquitectura=self.VERSION,
+                alertas=alertas,
+                recomendaciones=[
+                    "📋 Verificar que el municipio esté en la lista PDET/ZOMAC",
+                    "📋 Consultar Anexo 2 CONFIS para municipios elegibles"
+                ]
+            )
+
         # ========== CRITERIO 1: SROI (40%) ==========
         try:
             if detallado:
@@ -155,16 +181,15 @@ class MotorScoringArquitecturaC:
             score_probabilidad = self.criterio_probabilidad.evaluar(proyecto)
             contribucion_probabilidad = score_probabilidad * self.PESO_PROBABILIDAD
 
-            # Alertas específicas PDET
-            if hasattr(proyecto, 'tiene_municipios_pdet'):
-                if proyecto.tiene_municipios_pdet and score_probabilidad >= 80:
-                    recomendaciones.append(
-                        "💡 Proyecto en municipio PDET con alta prioridad sectorial"
-                    )
-                elif not proyecto.tiene_municipios_pdet:
-                    alertas.append(
-                        "ℹ️  Proyecto NO elegible para Obras por Impuestos (municipio no PDET)"
-                    )
+            # Alertas específicas CONFIS
+            if score_probabilidad >= 80:
+                recomendaciones.append(
+                    "💡 Alta prioridad CONFIS - Proyecto con excelente probabilidad de aprobación"
+                )
+            elif score_probabilidad >= 60:
+                recomendaciones.append(
+                    "ℹ️  Prioridad media CONFIS - Probabilidad aceptable de aprobación"
+                )
         except Exception as e:
             alertas.append(f"⚠️  Error Probabilidad: {e}")
             score_probabilidad = 0

@@ -1,16 +1,29 @@
 """
-Criterio de Probabilidad de Aprobación con integración PDET/ZOMAC.
+Criterio de Probabilidad de Aprobación CONFIS.
 
+Ajuste metodológico (Feb 2026):
 Evalúa la probabilidad de aprobación en Obras por Impuestos basándose
-ÚNICAMENTE en la priorización sectorial oficial PDET/ZOMAC.
+en la metodología oficial CONFIS (Anexo 2 - "Metodología para la
+distribución del CUPO CONFIS").
+
+Dos ejes de evaluación:
+1. Enfoque Territorial (40%): IPM + MDM_inv + IICA + CULTIVOS → promedio 1-10
+2. Enfoque Sectorial (40%): Brechas sectoriales por municipio → puntaje 1-10
+3. Grupo de Priorización (20%): Grupos 1-8 según tipo PATR/PDET/ZOMAC/Amazonia
+
+Score CONFIS = Territorial + Sectorial (rango 2-20)
+Score Criterio = GrupoPrioridad(20%) + ScoreCONFIS_Norm(80%)
 
 Obras por Impuestos es un mecanismo EXCLUSIVO para los 362 municipios
 PDET/ZOMAC. Municipios fuera de esta lista no pueden acceder al mecanismo.
 
-Versión actualizada con matriz oficial de 362 municipios.
+Historial:
+- Versión original: solo puntaje sectorial
+- Ajuste Feb 2026: integración completa metodología CONFIS
 """
 from enum import Enum
-from typing import List, Optional
+from dataclasses import dataclass
+from typing import List, Optional, Dict, Any
 import sys
 from pathlib import Path
 
@@ -29,23 +42,74 @@ class NivelProbabilidad(Enum):
     BAJA = "baja"
 
 
+# Grupos de priorización CONFIS (Anexo 2)
+# Puntajes asignados para scoring interno ENLAZA
+# Grupos impares = contribuyente paga estructuración (mayor prioridad)
+GRUPOS_CONFIS = {
+    1: {"nombre": "PATR-PDET + Estructuración contribuyente", "score": 100},
+    2: {"nombre": "PATR-PDET sin estructuración contribuyente", "score": 90},
+    3: {"nombre": "PDET + Estructuración contribuyente", "score": 80},
+    4: {"nombre": "PDET sin estructuración contribuyente", "score": 70},
+    5: {"nombre": "ZOMAC alta pobreza/conflicto + Estructuración", "score": 55},
+    6: {"nombre": "ZOMAC alta pobreza/conflicto sin estructuración", "score": 45},
+    7: {"nombre": "Amazonía + Estructuración contribuyente", "score": 35},
+    8: {"nombre": "Amazonía sin estructuración contribuyente", "score": 25},
+}
+
+
+@dataclass
+class ResultadoProbabilidadCONFIS:
+    """Resultado detallado de evaluación de Probabilidad CONFIS"""
+    score: float  # 0-100
+
+    # Componentes
+    score_grupo: float  # Score del grupo de priorización (0-100)
+    score_confis_normalizado: float  # Score CONFIS normalizado (0-100)
+    score_sectorial: float  # Puntaje sectorial (0-10)
+    score_territorial: float  # Puntaje territorial (0-10)
+    puntaje_confis_total: float  # Territorial + Sectorial (2-20)
+
+    # Contribuciones
+    contribucion_grupo: float
+    contribucion_confis: float
+
+    # Grupo CONFIS
+    grupo: int  # 1-8
+    grupo_nombre: str
+
+    # Metadata
+    nivel: str  # "ALTA", "MEDIA", "BAJA"
+    mensaje: str
+    alertas: List[str]
+    recomendaciones: List[str]
+
+
 class ProbabilidadAprobacionCriterio(CriterioEvaluacion):
     """
     Evalúa probabilidad de aprobación en mecanismo Obras por Impuestos
-    basándose en la matriz oficial de priorización sectorial PDET/ZOMAC.
+    basándose en la metodología CONFIS (Anexo 2).
 
     Criterio: 20% del score total (Arquitectura C)
 
-    Metodología:
-    - Usa matriz oficial de 362 municipios PDET/ZOMAC
-    - 10 sectores priorizados con puntajes 1-10
-    - Score = (puntaje_max_sectorial / 10) × 100
-    - Proyectos NO-PDET obtienen 0 (no aplican a este mecanismo)
+    Metodología CONFIS integrada (Feb 2026):
+    Score = GrupoPrioridad(20%) + ScoreCONFIS_Normalizado(80%)
 
-    Nota: ODS vinculados y población objetivo se guardan como metadata
-    descriptiva en el proyecto pero NO influyen en el scoring de este criterio
-    específico de Obras por Impuestos.
+    Donde:
+    - GrupoPrioridad: Score 25-100 según grupo 1-8
+    - ScoreCONFIS = (Territorial + Sectorial) / 20 × 100
+      - Territorial: promedio(IPM, MDM_inv, IICA, CULTIVOS), rango 1-10
+      - Sectorial: puntaje brecha del sector en municipio, rango 1-10
+
+    Grupos de priorización:
+    1-2: Proyectos PATR-PDET (con/sin estructuración contribuyente)
+    3-4: Municipios PDET (con/sin estructuración)
+    5-6: ZOMAC alta pobreza/conflicto (con/sin estructuración)
+    7-8: Amazonía (con/sin estructuración)
     """
+
+    # Pesos internos del criterio
+    PESO_GRUPO = 0.20
+    PESO_CONFIS = 0.80
 
     def __init__(
         self,
@@ -57,12 +121,12 @@ class ProbabilidadAprobacionCriterio(CriterioEvaluacion):
         Inicializa criterio.
 
         Args:
-            peso: Peso del criterio en evaluación total (recomendado: 0.20)
+            peso: Peso del criterio en evaluación total (0.20 = 20%)
             probabilidad_manual: Probabilidad asignada manualmente (opcional)
             db_path: Ruta a base de datos con matriz PDET
         """
         super().__init__(peso)
-        self.nombre = "Probabilidad de Aprobación PDET"
+        self.nombre = "Probabilidad de Aprobación CONFIS"
         self.probabilidad_manual = probabilidad_manual
 
         # Conectar a repositorio matriz PDET
@@ -75,226 +139,308 @@ class ProbabilidadAprobacionCriterio(CriterioEvaluacion):
 
     def evaluar(self, proyecto: ProyectoSocial) -> float:
         """
-        Evalúa probabilidad de aprobación basándose ÚNICAMENTE en
-        prioridad sectorial oficial de Obras por Impuestos PDET/ZOMAC.
-
-        El mecanismo Obras por Impuestos es EXCLUSIVO para municipios PDET/ZOMAC.
-        La aprobación se basa en los puntajes sectoriales oficiales (1-10).
-
-        ODS y población objetivo se guardan como metadata pero NO influyen
-        en el scoring de este criterio específico.
+        Evalúa probabilidad de aprobación usando metodología CONFIS.
 
         Returns:
-            Score de 0-100 basado en prioridad sectorial oficial:
-            - Puntaje 10/10 → 100/100 (máxima prioridad)
-            - Puntaje 5/10 → 50/100 (media prioridad)
-            - Puntaje 1/10 → 10/100 (baja prioridad)
-            - NO-PDET → 0/100 (no aplica al mecanismo)
+            Score 0-100 basado en grupo + score CONFIS
         """
         # Si hay probabilidad manual, usarla directamente
         if self.probabilidad_manual:
             return self._probabilidad_a_score(self.probabilidad_manual)
 
-        # ÚNICO COMPONENTE: Prioridad sectorial PDET/ZOMAC (100%)
-        score = self._evaluar_prioridad_sectorial_pdet(proyecto)
+        # Obtener componentes
+        grupo = self._determinar_grupo(proyecto)
+        score_grupo = GRUPOS_CONFIS.get(grupo, {"score": 25})["score"]
+
+        score_territorial = self._obtener_score_territorial(proyecto)
+        score_sectorial = self._obtener_score_sectorial(proyecto)
+
+        # Score CONFIS combinado (rango 2-20 → normalizado 0-100)
+        puntaje_confis = score_territorial + score_sectorial
+        score_confis_norm = (puntaje_confis / 20.0) * 100
+
+        # Score total ponderado
+        score = (
+            score_grupo * self.PESO_GRUPO +
+            score_confis_norm * self.PESO_CONFIS
+        )
+
+        # Guardar metadata en proyecto
+        proyecto.grupo_priorizacion_confis = grupo
+        proyecto.puntaje_confis_total = puntaje_confis
 
         return min(max(score, 0), 100)
 
-    def _evaluar_prioridad_sectorial_pdet(self, proyecto: ProyectoSocial) -> float:
+    def evaluar_detallado(self, proyecto: ProyectoSocial) -> ResultadoProbabilidadCONFIS:
         """
-        Evalúa prioridad sectorial usando matriz oficial PDET/ZOMAC.
-
-        Lógica:
-        1. Identifica municipios PDET del proyecto
-        2. Para cada municipio, obtiene puntajes de sectores del proyecto
-        3. Usa el puntaje MÁXIMO (favorece mejor oportunidad)
-        4. Convierte puntaje 1-10 a score 0-100
+        Evaluación detallada con metadata completa.
 
         Returns:
-            Score 0-100 basado en priorización sectorial oficial
-            0 si el proyecto no está en municipios PDET/ZOMAC
+            ResultadoProbabilidadCONFIS con desglose completo
         """
+        alertas = []
+        recomendaciones = []
+
+        # Determinar grupo
+        grupo = self._determinar_grupo(proyecto)
+        grupo_info = GRUPOS_CONFIS.get(grupo, {"nombre": "Desconocido", "score": 25})
+        score_grupo = grupo_info["score"]
+
+        # Scores componentes
+        score_territorial = self._obtener_score_territorial(proyecto)
+        score_sectorial = self._obtener_score_sectorial(proyecto)
+
+        # Score CONFIS combinado
+        puntaje_confis = score_territorial + score_sectorial
+        score_confis_norm = (puntaje_confis / 20.0) * 100
+
+        # Contribuciones
+        contrib_grupo = score_grupo * self.PESO_GRUPO
+        contrib_confis = score_confis_norm * self.PESO_CONFIS
+
+        # Score total
+        score = contrib_grupo + contrib_confis
+
+        # Guardar metadata
+        proyecto.grupo_priorizacion_confis = grupo
+        proyecto.puntaje_confis_total = puntaje_confis
+
+        # Alertas por grupo
+        if grupo <= 2:
+            alertas.append(
+                f"⭐ Grupo {grupo} PATR-PDET: Máxima prioridad en distribución CONFIS"
+            )
+        elif grupo <= 4:
+            alertas.append(
+                f"✅ Grupo {grupo} PDET: Alta prioridad en distribución CONFIS"
+            )
+        elif grupo <= 6:
+            alertas.append(
+                f"ℹ️  Grupo {grupo} ZOMAC: Prioridad media en distribución CONFIS"
+            )
+        else:
+            alertas.append(
+                f"⚠️  Grupo {grupo} Amazonía: Prioridad baja en distribución CONFIS"
+            )
+
+        # Alertas por score
+        if score_sectorial >= 8:
+            alertas.append(
+                f"⭐ Brecha sectorial alta ({score_sectorial}/10): "
+                f"Sector con necesidad urgente en el municipio"
+            )
+
+        if score_territorial >= 8:
+            alertas.append(
+                f"⭐ Puntaje territorial alto ({score_territorial:.1f}/10): "
+                f"Municipio con alta vulnerabilidad"
+            )
+
+        # Recomendaciones
+        if not proyecto.contribuyente_paga_estructuracion:
+            recomendaciones.append(
+                "💡 Si el contribuyente paga estructuración, sube al grupo "
+                f"impar ({grupo-1 if grupo % 2 == 0 else grupo}) con mayor prioridad"
+            )
+
+        if score < 50:
+            recomendaciones.append(
+                "⚠️  Probabilidad baja: Considerar sectores con mayor brecha "
+                "o municipios con mayor puntaje territorial"
+            )
+
+        if score_territorial == 5.0 and proyecto.puntaje_territorial_confis is None:
+            recomendaciones.append(
+                "📋 Puntaje territorial no especificado (usando default 5.0). "
+                "Especificar puntaje_territorial_confis para mayor precisión"
+            )
+
+        # Determinar nivel
+        nivel = self._determinar_nivel(score)
+
+        # Mensaje
+        if score >= 80:
+            mensaje = "Alta probabilidad de aprobación CONFIS"
+        elif score >= 60:
+            mensaje = "Probabilidad media de aprobación CONFIS"
+        elif score >= 40:
+            mensaje = "Probabilidad baja-media de aprobación CONFIS"
+        else:
+            mensaje = "Probabilidad baja de aprobación CONFIS"
+
+        return ResultadoProbabilidadCONFIS(
+            score=min(max(score, 0), 100),
+            score_grupo=score_grupo,
+            score_confis_normalizado=score_confis_norm,
+            score_sectorial=score_sectorial,
+            score_territorial=score_territorial,
+            puntaje_confis_total=puntaje_confis,
+            contribucion_grupo=contrib_grupo,
+            contribucion_confis=contrib_confis,
+            grupo=grupo,
+            grupo_nombre=grupo_info["nombre"],
+            nivel=nivel,
+            mensaje=mensaje,
+            alertas=alertas,
+            recomendaciones=recomendaciones
+        )
+
+    def _determinar_grupo(self, proyecto: ProyectoSocial) -> int:
+        """
+        Determina el grupo de priorización CONFIS (1-8).
+
+        Lógica (Anexo 2 CONFIS):
+        - Grupos 1-2: Proyectos PATR-PDET
+        - Grupos 3-4: Municipios PDET
+        - Grupos 5-6: ZOMAC alta pobreza/conflicto
+        - Grupos 7-8: Amazonía
+        - Impares: contribuyente paga estructuración
+        - Pares: sin estructuración contribuyente
+        """
+        # Si ya está asignado manualmente, usarlo
+        if proyecto.grupo_priorizacion_confis:
+            return proyecto.grupo_priorizacion_confis
+
+        # Determinar tipo de municipio
+        tipo = proyecto.tipo_municipio
+
+        # Inferir tipo si no está definido
+        if tipo is None:
+            if proyecto.tiene_municipios_pdet:
+                tipo = "PDET"
+            else:
+                tipo = "PDET"  # Default conservador para elegibles
+
+        # Asignar grupo base
+        if proyecto.es_patr_pdet:
+            grupo_base = 1  # PATR-PDET
+        elif tipo == "PDET":
+            grupo_base = 3  # PDET
+        elif tipo == "ZOMAC":
+            grupo_base = 5  # ZOMAC
+        elif tipo == "AMAZONIA":
+            grupo_base = 7  # Amazonía
+        else:
+            grupo_base = 5  # Default conservador
+
+        # Ajustar por estructuración (impares = con, pares = sin)
+        if not proyecto.contribuyente_paga_estructuracion:
+            grupo_base += 1
+
+        return min(grupo_base, 8)
+
+    def _obtener_score_territorial(self, proyecto: ProyectoSocial) -> float:
+        """
+        Obtiene puntaje territorial CONFIS (1-10).
+
+        El puntaje territorial es el promedio de:
+        - IPM (Índice de Pobreza Multidimensional)
+        - MDM invertido (Desempeño Municipal)
+        - IICA (Incidencia Conflicto Armado)
+        - CULTIVOS (Cultivos Ilícitos)
+
+        Cada componente normalizado 1-10.
+
+        Returns:
+            Puntaje territorial 1-10 (5.0 si no disponible)
+        """
+        # Si está definido en el proyecto, usarlo
+        if proyecto.puntaje_territorial_confis is not None:
+            return max(min(proyecto.puntaje_territorial_confis, 10.0), 1.0)
+
+        # Default neutro: 5.0 (punto medio de la escala)
+        return 5.0
+
+    def _obtener_score_sectorial(self, proyecto: ProyectoSocial) -> float:
+        """
+        Obtiene puntaje sectorial CONFIS (1-10).
+
+        Usa la matriz PDET existente para obtener el puntaje de brecha
+        del sector del proyecto en el municipio.
+
+        Returns:
+            Puntaje sectorial 1-10 (5.0 si no disponible)
+        """
+        # Si ya tiene puntaje sectorial max calculado, usarlo
+        if proyecto.puntaje_sectorial_max is not None:
+            return float(max(min(proyecto.puntaje_sectorial_max, 10), 1))
+
+        # Intentar obtener de la base de datos
         if self.matriz_repo is None:
-            # Sin matriz PDET → No se puede evaluar, retornar 0
-            return 0.0
+            return 5.0  # Neutro sin DB
 
         if not proyecto.municipios or not proyecto.sectores:
-            # Sin datos suficientes → No se puede evaluar
-            return 0.0
+            return 5.0
 
         puntajes_encontrados = []
 
-        # Evaluar cada combinación municipio-sector
         for municipio_nombre in proyecto.municipios:
-            # Buscar departamento del municipio
             departamento = self._get_departamento_municipio(
-                municipio_nombre,
-                proyecto.departamentos
+                municipio_nombre, proyecto.departamentos
             )
-
             if not departamento:
                 continue
 
-            # Obtener registro PDET del municipio
             registro = self.matriz_repo.get_municipio(departamento, municipio_nombre)
-
             if not registro:
-                # Municipio no es PDET/ZOMAC → No suma puntaje
                 continue
 
-            # Obtener puntajes de cada sector del proyecto
             for sector in proyecto.sectores:
                 puntaje = registro.get_puntaje_sector(sector)
                 if puntaje > 0:
-                    puntajes_encontrados.append({
-                        'municipio': municipio_nombre,
-                        'departamento': departamento,
-                        'sector': sector,
-                        'puntaje': puntaje
-                    })
+                    puntajes_encontrados.append(puntaje)
 
         if not puntajes_encontrados:
-            # Ningún municipio es PDET/ZOMAC
-            # → Score 0 (no puede usar mecanismo Obras por Impuestos)
-            proyecto.tiene_municipios_pdet = False
-            return 0.0
+            return 5.0
 
-        # Usar puntaje MÁXIMO (favorece mejor oportunidad)
-        mejor_match = max(puntajes_encontrados, key=lambda x: x['puntaje'])
-        puntaje_max = mejor_match['puntaje']
+        # Usar puntaje máximo (favorece mejor oportunidad)
+        puntaje_max = max(puntajes_encontrados)
 
-        # Convertir puntaje 1-10 a score 0-100
-        # Puntaje 10 → 100 pts (máxima prioridad)
-        # Puntaje 5 → 50 pts (media)
-        # Puntaje 1 → 10 pts (baja prioridad)
-        score = (puntaje_max / 10) * 100
-
-        # Guardar metadata en proyecto
+        # Guardar metadata
         proyecto.tiene_municipios_pdet = True
         proyecto.puntaje_sectorial_max = puntaje_max
 
-        # Guardar todos los puntajes por sector
-        puntajes_por_sector = {}
-        for match in puntajes_encontrados:
-            sector = match['sector']
-            if sector not in puntajes_por_sector or match['puntaje'] > puntajes_por_sector[sector]:
-                puntajes_por_sector[sector] = match['puntaje']
-
-        proyecto.puntajes_pdet = puntajes_por_sector
-
-        return score
+        return float(puntaje_max)
 
     def _get_departamento_municipio(
         self,
         municipio: str,
         departamentos: List[str]
     ) -> Optional[str]:
-        """
-        Identifica departamento de un municipio.
-
-        Args:
-            municipio: Nombre del municipio
-            departamentos: Lista de departamentos del proyecto
-
-        Returns:
-            Nombre del departamento o None
-        """
-        # Estrategia simple: usar primer departamento
-        # TODO: Mejorar con validación cruzada en FASE 3
+        """Identifica departamento de un municipio."""
         if not departamentos:
             return None
 
-        # Si hay múltiples departamentos, intentar encontrar el correcto
         if len(departamentos) == 1:
             return departamentos[0]
 
-        # Buscar en cada departamento
         for depto in departamentos:
             if self.matriz_repo and self.matriz_repo.es_municipio_pdet(depto, municipio):
                 return depto
 
-        # Si no encontró, usar primero
         return departamentos[0]
 
-    def _evaluar_ods(self, proyecto: ProyectoSocial) -> float:
-        """
-        Evalúa ODS vinculados.
-
-        ODS prioritarios en Colombia: 1, 2, 3, 4, 5, 8, 10, 16
-
-        Returns:
-            Score 0-100 basado en alineación con ODS
-        """
-        ods_prioritarios = ["1", "2", "3", "4", "5", "8", "10", "16"]
-        num_ods_prioritarios = len([
-            ods for ods in proyecto.ods_vinculados
-            if ods in ods_prioritarios
-        ])
-
-        if num_ods_prioritarios >= 3:
-            return 100  # Altamente alineado
-        elif num_ods_prioritarios >= 2:
-            return 75  # Bien alineado
-        elif num_ods_prioritarios >= 1:
-            return 50  # Parcialmente alineado
+    def _determinar_nivel(self, score: float) -> str:
+        """Determina nivel de probabilidad basado en score."""
+        if score >= 75:
+            return "ALTA"
+        elif score >= 45:
+            return "MEDIA"
         else:
-            return 25  # Baja alineación
-
-    def _evaluar_poblacion_prioritaria(self, proyecto: ProyectoSocial) -> float:
-        """
-        Evalúa población objetivo prioritaria.
-
-        Poblaciones prioritarias gobierno:
-        - Niños/niñas/adolescentes
-        - Mujeres
-        - Adultos mayores
-        - Personas con discapacidad
-        - Víctimas del conflicto
-        - Comunidades étnicas (indígenas, afrocolombianos)
-        - Población vulnerable
-
-        Returns:
-            Score 0-100 basado en población objetivo
-        """
-        poblaciones_prioritarias = [
-            "niños", "niñas", "infancia", "adolescentes", "mujeres",
-            "adultos mayores", "discapacidad", "desplazados",
-            "víctimas", "indígenas", "afrocolombianos", "vulnerable"
-        ]
-
-        poblacion_lower = proyecto.poblacion_objetivo.lower()
-        tiene_prioritaria = any(pop in poblacion_lower for pop in poblaciones_prioritarias)
-
-        return 100 if tiene_prioritaria else 40
+            return "BAJA"
 
     def _probabilidad_a_score(self, probabilidad: NivelProbabilidad) -> float:
-        """
-        Convierte nivel de probabilidad manual a score numérico.
-
-        Args:
-            probabilidad: Nivel de probabilidad (alta, media, baja)
-
-        Returns:
-            Score de 0-100
-        """
+        """Convierte nivel manual a score."""
         if probabilidad == NivelProbabilidad.ALTA:
             return 100
         elif probabilidad == NivelProbabilidad.MEDIA:
             return 60
-        else:  # BAJA
+        else:
             return 30
 
     @staticmethod
     def score_a_probabilidad(score: float) -> str:
-        """
-        Convierte score numérico a nivel de probabilidad.
-
-        Args:
-            score: Score de 0-100
-
-        Returns:
-            Nivel de probabilidad como string ("alta", "media", "baja")
-        """
+        """Convierte score a nivel de probabilidad."""
         if score >= 75:
             return "alta"
         elif score >= 45:
@@ -303,59 +449,50 @@ class ProbabilidadAprobacionCriterio(CriterioEvaluacion):
             return "baja"
 
     def evaluar_con_nivel(self, proyecto: ProyectoSocial) -> tuple:
-        """
-        Evalúa el proyecto y retorna score + nivel de probabilidad.
-
-        Returns:
-            Tupla (score, nivel) donde nivel es "alta", "media" o "baja"
-        """
+        """Evalúa y retorna (score, nivel)."""
         score = self.evaluar(proyecto)
         nivel = self.score_a_probabilidad(score)
         return score, nivel
 
     def get_nombre(self) -> str:
-        return "Probabilidad de Aprobación (PDET/ZOMAC)"
+        return "Probabilidad de Aprobación CONFIS"
 
     def get_descripcion(self) -> str:
         return (
             "Evalúa la probabilidad de aprobación en Obras por Impuestos usando "
-            "datos oficiales de priorización sectorial PDET/ZOMAC para 362 municipios. "
-            "Score basado 100% en puntajes sectoriales oficiales (1-10). "
-            "Municipios NO-PDET obtienen score 0 (mecanismo exclusivo PDET/ZOMAC)."
+            "la metodología CONFIS (Anexo 2). Integra enfoque territorial "
+            "(IPM, MDM, IICA, CULTIVOS), enfoque sectorial (brechas por municipio) "
+            "y grupo de priorización (1-8). "
+            "Score = GrupoPrioridad(20%) + ScoreCONFIS(80%)."
         )
 
     def get_detalles_evaluacion(self, proyecto: ProyectoSocial) -> dict:
-        """
-        Retorna detalles de la evaluación para debugging y análisis.
+        """Retorna detalles de la evaluación para debugging."""
+        resultado = self.evaluar_detallado(proyecto)
 
-        Returns:
-            Diccionario con métricas clave
-        """
-        score, nivel = self.evaluar_con_nivel(proyecto)
-
-        # Calcular componente único
-        score_pdet = self._evaluar_prioridad_sectorial_pdet(proyecto)
-
-        detalles = {
-            'probabilidad_nivel': nivel,
-            'score_total': score,
+        return {
+            'probabilidad_nivel': resultado.nivel,
+            'score_total': resultado.score,
             'componentes': {
-                'prioridad_sectorial_pdet': {
-                    'score': score_pdet,
-                    'peso': 1.00,  # 100% del criterio
-                    'ponderado': score_pdet * 1.00
+                'grupo_priorizacion': {
+                    'grupo': resultado.grupo,
+                    'nombre': resultado.grupo_nombre,
+                    'score': resultado.score_grupo,
+                    'peso': self.PESO_GRUPO,
+                    'ponderado': resultado.contribucion_grupo
+                },
+                'score_confis': {
+                    'territorial': resultado.score_territorial,
+                    'sectorial': resultado.score_sectorial,
+                    'confis_total': resultado.puntaje_confis_total,
+                    'normalizado': resultado.score_confis_normalizado,
+                    'peso': self.PESO_CONFIS,
+                    'ponderado': resultado.contribucion_confis
                 }
             },
             'municipios_pdet': proyecto.tiene_municipios_pdet,
-            'puntaje_sectorial_max': proyecto.puntaje_sectorial_max,
-            'puntajes_por_sector': proyecto.puntajes_pdet,
-            'sectores_proyecto': proyecto.sectores,
-            'municipios_proyecto': proyecto.municipios,
-            # Metadata descriptiva (NO afecta scoring)
-            'metadata': {
-                'ods_vinculados': proyecto.ods_vinculados,
-                'poblacion_objetivo': proyecto.poblacion_objetivo
-            }
+            'tipo_municipio': proyecto.tipo_municipio,
+            'es_patr_pdet': proyecto.es_patr_pdet,
+            'alertas': resultado.alertas,
+            'recomendaciones': resultado.recomendaciones
         }
-
-        return detalles

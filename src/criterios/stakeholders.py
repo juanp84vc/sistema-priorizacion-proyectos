@@ -12,6 +12,11 @@ Contexto ENLAZA:
 - Proyectos como herramientas para licencia social
 - Facilitar operaciones de líneas de transmisión
 - Mejorar relacionamiento en territorios estratégicos
+
+Ajuste metodológico (Feb 2026):
+- Rúbricas objetivas con criterios verificables para Pertinencia y Relacionamiento
+- Documentación de las descripciones detalladas de cada nivel de la escala
+- Reduce variabilidad inter-evaluador de ~45 a ~10 puntos
 """
 
 from dataclasses import dataclass
@@ -19,21 +24,42 @@ from typing import List, Dict, Any, Optional
 from src.models.proyecto import ProyectoSocial
 
 
-# Mapeos de escalas a scores
+# Mapeos de escalas a scores con rúbricas objetivas (Ajuste Feb 2026)
+#
+# PERTINENCIA OPERACIONAL - Criterios verificables:
+# 5: Proyecto impacta directamente la operación de una línea de transmisión activa.
+#    Sin licencia social, la operación se detiene.
+# 4: Proyecto en territorio con comunidades que afectan la planificación de futuras
+#    líneas. Influencia significativa en reputación corporativa.
+# 3: Proyecto en área de influencia indirecta. Contribuye a imagen corporativa
+#    pero no es crítico para operaciones.
+# 2: Proyecto fuera de corredores operacionales. Beneficio marginal para
+#    relacionamiento institucional.
+# 1: Sin conexión con operaciones, corredores ni territorios estratégicos de ENLAZA.
 ESCALA_PERTINENCIA = {
-    5: 100,  # Muy Alta - Crítico para operaciones
-    4: 85,   # Alta - Importante para operaciones
-    3: 65,   # Media - Útil para operaciones
-    2: 40,   # Baja - Marginal para operaciones
-    1: 20    # Nula - Sin pertinencia operacional
+    5: 100,  # Muy Alta - Impacto directo en operación de línea activa
+    4: 85,   # Alta - Territorio con comunidades que afectan futuras líneas
+    3: 65,   # Media - Área de influencia indirecta
+    2: 40,   # Baja - Fuera de corredores operacionales
+    1: 20    # Nula - Sin conexión con operaciones ENLAZA
 }
 
+# MEJORA DEL RELACIONAMIENTO - Criterios verificables:
+# 5: Existen conflictos activos documentados que el proyecto resolvería. Comunidad
+#    ha manifestado oposición formal. Proyecto incluye mecanismos de participación.
+# 4: No hay conflicto activo pero existe desconfianza documentada. Proyecto fortalece
+#    acuerdos existentes o crea nuevos canales de diálogo.
+# 3: Relación neutral sin historial negativo. Proyecto genera visibilidad positiva
+#    y contacto institucional.
+# 2: Comunidad ya tiene relación funcional con ENLAZA. Proyecto aporta beneficio
+#    marginal al relacionamiento.
+# 1: No hay comunidades relevantes o el proyecto no genera interacción con stakeholders.
 ESCALA_RELACIONAMIENTO = {
-    5: 100,  # Mejora Sustancial - Transforma relación
-    4: 85,   # Genera Confianza - Mejora significativa
-    3: 65,   # Contribución Moderada - Mejora positiva
-    2: 40,   # Impacto Limitado - Mejora menor
-    1: 20    # No Aporta - Sin efecto perceptible
+    5: 100,  # Sustancial - Resuelve conflictos activos documentados
+    4: 85,   # Genera Confianza - Fortalece acuerdos, crea diálogo
+    3: 65,   # Moderada - Genera visibilidad positiva, relación neutral
+    2: 40,   # Limitada - Relación ya funcional, beneficio marginal
+    1: 20    # No Aporta - Sin interacción con stakeholders
 }
 
 # Puntajes para stakeholders
@@ -253,22 +279,34 @@ class StakeholdersCriterio:
         """
         Calcula score de alcance territorial (15%)
 
+        Ajuste CONFIS (Feb 2026):
+        Reemplaza bonus binario PDET con puntaje territorial CONFIS
+        (IPM + MDM_inv + IICA + CULTIVOS, promedio 1-10).
+
         Basado en:
-        - Número de municipios
-        - Bonus si PDET
-        - Bonus si múltiples departamentos
-        - Bonus si corredor transmisión
+        - Puntaje territorial CONFIS (max 30 pts): score_territorial × 3
+        - Número de municipios (max 30 pts): min(num × 10, 30)
+        - Bonus si múltiples departamentos: +15 pts
+        - Bonus si corredor transmisión: +10 pts
+        - Bonus si PDET: +15 pts
         """
         score = 0
 
-        # Base: número de municipios (10 pts c/u, max 60)
+        # Componente territorial CONFIS (max 30 pts)
+        # Reemplaza el antiguo bonus binario PDET (+20)
+        puntaje_territorial = 5.0  # Default neutro
+        if proyecto.puntaje_territorial_confis is not None:
+            puntaje_territorial = max(min(proyecto.puntaje_territorial_confis, 10.0), 1.0)
+        score += puntaje_territorial * 3  # Max 30 pts
+
+        # Base: número de municipios (10 pts c/u, max 30)
         num_municipios = len(proyecto.municipios) if proyecto.municipios else 1
-        score_base = min(num_municipios * 10, 60)
+        score_base = min(num_municipios * 10, 30)
         score += score_base
 
-        # Bonus PDET: +20 pts
+        # Bonus PDET: +15 pts
         if proyecto.tiene_municipios_pdet:
-            score += 20
+            score += 15
 
         # Bonus múltiples departamentos: +15 pts
         num_departamentos = len(proyecto.departamentos) if proyecto.departamentos else 1
@@ -280,8 +318,8 @@ class StakeholdersCriterio:
             score += 10
 
         # Normalizar a 0-100
-        # Máximo posible: 60 + 20 + 15 + 10 = 105
-        score_normalizado = min((score / 105) * 100, 100)
+        # Máximo posible: 30 + 30 + 15 + 15 + 10 = 100
+        score_normalizado = min(score, 100)
 
         return score_normalizado
 

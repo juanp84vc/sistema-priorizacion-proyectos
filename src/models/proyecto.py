@@ -63,6 +63,27 @@ class ProyectoSocial:
     # NUEVO: Puntaje máximo sectorial (calculado)
     puntaje_sectorial_max: Optional[int] = None
 
+    # ========== NUEVOS: Campos CONFIS (Ajuste Feb 2026) ==========
+
+    # Tipo de municipio para elegibilidad Obras por Impuestos
+    tipo_municipio: Optional[str] = None
+    # Opciones: "PDET", "ZOMAC", "AMAZONIA", None (no elegible)
+
+    # Es proyecto PATR-PDET (Plan de Acción para la Transformación Regional)
+    es_patr_pdet: bool = False
+
+    # Contribuyente paga costos de estructuración
+    contribuyente_paga_estructuracion: bool = False
+
+    # Grupo de priorización CONFIS (1-8, calculado o manual)
+    grupo_priorizacion_confis: Optional[int] = None
+
+    # Puntaje territorial CONFIS (1-10): promedio de IPM, MDM_inv, IICA, CULTIVOS
+    puntaje_territorial_confis: Optional[float] = None
+
+    # Puntaje CONFIS combinado: Territorial + Sectorial (2-20)
+    puntaje_confis_total: Optional[float] = None
+
     # NUEVO: Observaciones SROI (metodología, supuestos, fuentes) - Arquitectura C
     observaciones_sroi: str = ""
     # Max 1000 caracteres
@@ -134,6 +155,20 @@ class ProyectoSocial:
             raise ValueError("Duración debe ser mayor a 0")
         if self.presupuesto_total <= 0:
             raise ValueError("Presupuesto debe ser mayor a 0")
+
+    @property
+    def es_elegible_oxi(self) -> bool:
+        """
+        Verifica elegibilidad para Obras por Impuestos.
+
+        Ajuste CONFIS (Feb 2026):
+        Solo municipios PDET y/o ZOMAC pueden acceder al mecanismo.
+        Si tipo_municipio está definido, lo usa.
+        Si no, usa tiene_municipios_pdet como fallback.
+        """
+        if self.tipo_municipio:
+            return self.tipo_municipio in ("PDET", "ZOMAC", "AMAZONIA")
+        return self.tiene_municipios_pdet
 
     @property
     def beneficiarios_totales(self) -> int:

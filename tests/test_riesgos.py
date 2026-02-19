@@ -212,37 +212,37 @@ class TestRiesgosCriterio(unittest.TestCase):
     # ========== TESTS: FACTORES AUTOMÁTICOS ==========
 
     def test_factor_automatico_presupuesto_bajo(self):
-        """Test: Presupuesto bajo → Sin penalización"""
+        """Test: Presupuesto bajo → Score neutral 100.0"""
         proyecto = self._crear_proyecto_base()
         proyecto.presupuesto_total = 100_000_000  # 100M (bajo)
 
         score = self.criterio._calcular_factores_automaticos(proyecto)
 
-        # Score = 100 (sin penalización)
+        # Score = 100.0 (neutral, sin penalización)
         self.assertEqual(score, 100.0)
 
     def test_factor_automatico_presupuesto_medio(self):
-        """Test: Presupuesto medio → Penalización -10"""
+        """Test: Presupuesto medio → Score neutral 100.0"""
         proyecto = self._crear_proyecto_base()
         proyecto.presupuesto_total = 600_000_000  # 600M (medio)
 
         score = self.criterio._calcular_factores_automaticos(proyecto)
 
-        # Score = 90 (100 - 10)
-        self.assertEqual(score, 90.0)
+        # Score = 100.0 (neutral, genera alerta informativa)
+        self.assertEqual(score, 100.0)
 
     def test_factor_automatico_presupuesto_alto(self):
-        """Test: Presupuesto alto → Penalización -15"""
+        """Test: Presupuesto alto → Score neutral 100.0"""
         proyecto = self._crear_proyecto_base()
         proyecto.presupuesto_total = 1_500_000_000  # 1.5B (alto)
 
         score = self.criterio._calcular_factores_automaticos(proyecto)
 
-        # Score = 85 (100 - 15)
-        self.assertEqual(score, 85.0)
+        # Score = 100.0 (neutral, genera alerta informativa)
+        self.assertEqual(score, 100.0)
 
     def test_factor_automatico_duracion_corta(self):
-        """Test: Duración corta → Sin penalización"""
+        """Test: Duración corta → Score neutral 100.0"""
         proyecto = self._crear_proyecto_base()
         proyecto.duracion_estimada_meses = 6  # 6 meses
 
@@ -251,46 +251,46 @@ class TestRiesgosCriterio(unittest.TestCase):
         self.assertEqual(score, 100.0)
 
     def test_factor_automatico_duracion_media(self):
-        """Test: Duración media → Penalización -5"""
+        """Test: Duración media → Score neutral 100.0"""
         proyecto = self._crear_proyecto_base()
         proyecto.duracion_estimada_meses = 18  # 18 meses
 
         score = self.criterio._calcular_factores_automaticos(proyecto)
 
-        # Score = 95 (100 - 5)
-        self.assertEqual(score, 95.0)
+        # Score = 100.0 (neutral, genera alerta informativa)
+        self.assertEqual(score, 100.0)
 
     def test_factor_automatico_duracion_larga(self):
-        """Test: Duración larga → Penalización -10"""
+        """Test: Duración larga → Score neutral 100.0"""
         proyecto = self._crear_proyecto_base()
         proyecto.duracion_estimada_meses = 36  # 36 meses
 
         score = self.criterio._calcular_factores_automaticos(proyecto)
 
-        # Score = 90 (100 - 10)
-        self.assertEqual(score, 90.0)
+        # Score = 100.0 (neutral, genera alerta informativa)
+        self.assertEqual(score, 100.0)
 
     def test_factor_automatico_multiples_departamentos(self):
-        """Test: Múltiples departamentos → Penalización -5"""
+        """Test: Múltiples departamentos → Score neutral 100.0"""
         proyecto = self._crear_proyecto_base()
         proyecto.departamentos = ["CUNDINAMARCA", "BOYACÁ", "TOLIMA"]  # 3 depts
 
         score = self.criterio._calcular_factores_automaticos(proyecto)
 
-        # Score = 95 (100 - 5)
-        self.assertEqual(score, 95.0)
+        # Score = 100.0 (neutral, genera alerta informativa)
+        self.assertEqual(score, 100.0)
 
     def test_factor_automatico_acumulado(self):
-        """Test: Múltiples factores → Penalizaciones acumuladas"""
+        """Test: Múltiples factores → Score neutral 100.0"""
         proyecto = self._crear_proyecto_base()
-        proyecto.presupuesto_total = 1_500_000_000  # -15
-        proyecto.duracion_estimada_meses = 36  # -10
-        proyecto.departamentos = ["CUNDINAMARCA", "BOYACÁ", "TOLIMA"]  # -5
+        proyecto.presupuesto_total = 1_500_000_000
+        proyecto.duracion_estimada_meses = 36
+        proyecto.departamentos = ["CUNDINAMARCA", "BOYACÁ", "TOLIMA"]
 
         score = self.criterio._calcular_factores_automaticos(proyecto)
 
-        # Score = 70 (100 - 15 - 10 - 5)
-        self.assertEqual(score, 70.0)
+        # Score = 100.0 (neutral, genera alertas informativas)
+        self.assertEqual(score, 100.0)
 
     # ========== TESTS: PESOS DE COMPONENTES ==========
 

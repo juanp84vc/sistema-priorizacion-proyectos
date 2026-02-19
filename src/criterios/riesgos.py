@@ -227,6 +227,9 @@ class RiesgosCriterio:
                 f"Marco legal muy incierto"
             )
 
+        # Alertas contextuales (informativas, no penalizan score)
+        alertas.extend(self._generar_alertas_contextuales(proyecto))
+
         # Recomendaciones
         if score < 40:
             recomendaciones.append(
@@ -316,45 +319,85 @@ class RiesgosCriterio:
 
     def _calcular_factores_automaticos(self, proyecto: ProyectoSocial) -> float:
         """
-        Calcula score de factores automáticos de riesgo.
+        Calcula score base de factores contextuales de riesgo.
 
-        Penalizaciones automáticas basadas en características del proyecto.
+        Ajuste metodológico (Feb 2026):
+        Los factores automáticos ya NO penalizan el score numérico.
+        Su impacto real era <1 pt en score total (10% de 15% = 1.5%).
+        Ahora retornan score neutro (100) y generan alertas informativas
+        a través de _generar_alertas_contextuales().
+
+        Returns:
+            100.0 (score neutro - sin penalización numérica)
         """
-        score = 100.0
+        return 100.0
 
-        # Penalización por presupuesto alto
+    def _generar_alertas_contextuales(self, proyecto: ProyectoSocial) -> List[str]:
+        """
+        Genera alertas informativas basadas en factores contextuales.
+
+        Ajuste metodológico (Feb 2026):
+        Estos factores se presentan como información para el comité,
+        no como penalización numérica al score.
+
+        Returns:
+            Lista de alertas informativas
+        """
+        alertas = []
+
+        # Alerta por presupuesto alto
         if proyecto.presupuesto_total:
             if proyecto.presupuesto_total > 1_000_000_000:
-                score -= 15
+                alertas.append(
+                    f"ℹ️  Presupuesto alto (${proyecto.presupuesto_total:,.0f}): "
+                    f"Requiere supervisión financiera reforzada"
+                )
             elif proyecto.presupuesto_total > 500_000_000:
-                score -= 10
+                alertas.append(
+                    f"ℹ️  Presupuesto significativo (${proyecto.presupuesto_total:,.0f}): "
+                    f"Considerar controles financieros adicionales"
+                )
 
-        # Penalización por duración larga
+        # Alerta por duración larga
         if proyecto.duracion_estimada_meses:
             if proyecto.duracion_estimada_meses > 24:
-                score -= 10
+                alertas.append(
+                    f"ℹ️  Duración extendida ({proyecto.duracion_estimada_meses} meses): "
+                    f"Planificar hitos de seguimiento intermedios"
+                )
             elif proyecto.duracion_estimada_meses > 12:
-                score -= 5
+                alertas.append(
+                    f"ℹ️  Duración media ({proyecto.duracion_estimada_meses} meses): "
+                    f"Incluir revisión trimestral de avance"
+                )
 
-        # Penalización por múltiples departamentos
+        # Alerta por múltiples departamentos
         if proyecto.departamentos and len(proyecto.departamentos) > 2:
-            score -= 5
+            alertas.append(
+                f"ℹ️  Cobertura multi-departamental ({len(proyecto.departamentos)} dptos): "
+                f"Requiere coordinación territorial"
+            )
 
-        # Penalización por población vulnerable
+        # Alerta por población vulnerable
         if (hasattr(proyecto, 'stakeholders_involucrados') and
             proyecto.stakeholders_involucrados and
             'comunidades_indigenas' in proyecto.stakeholders_involucrados):
-            score -= 5  # Mayor complejidad cultural/legal
+            alertas.append(
+                "ℹ️  Involucra comunidades indígenas: "
+                "Verificar cumplimiento de consulta previa"
+            )
 
-        # Penalización por municipio NO-PDET (potencialmente menos apoyo)
+        # Alerta por zona de conflicto sin PDET
         if hasattr(proyecto, 'tiene_municipios_pdet') and not proyecto.tiene_municipios_pdet:
-            # Solo si está en zona que podría tener conflictos
             if proyecto.departamentos:
                 departamentos_conflicto = ['CHOCÓ', 'CAUCA', 'NARIÑO', 'PUTUMAYO', 'CAQUETÁ']
                 if any(d in departamentos_conflicto for d in proyecto.departamentos):
-                    score -= 10
+                    alertas.append(
+                        "ℹ️  Zona de conflicto sin clasificación PDET: "
+                        "Evaluar condiciones de seguridad territorial"
+                    )
 
-        return max(score, 0)
+        return alertas
 
     def _determinar_nivel_general(self, niveles: List[int]) -> str:
         """

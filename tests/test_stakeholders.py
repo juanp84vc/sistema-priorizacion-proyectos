@@ -247,9 +247,10 @@ class TestStakeholdersCriterio(unittest.TestCase):
             poblacion_objetivo="Test"
         )
         resultado = self.criterio.evaluar_detallado(proyecto)
-        # 1 municipio = 10 pts → ~9.5/100
-        self.assertLess(resultado.score_alcance, 15)
-        self.assertGreater(resultado.score_alcance, 8)
+        # CONFIS (Feb 2026): territorial_default=5×3=15, 1 municipio=10, no PDET=0
+        # Total = 25/100
+        self.assertLess(resultado.score_alcance, 30)
+        self.assertGreater(resultado.score_alcance, 20)
 
     def test_alcance_pdet_aumenta_score(self):
         """Municipio PDET debe aumentar score significativamente"""
@@ -273,9 +274,10 @@ class TestStakeholdersCriterio(unittest.TestCase):
             poblacion_objetivo="Test"
         )
         resultado = self.criterio.evaluar_detallado(proyecto)
-        # 1 municipio (10) + PDET (20) = 30 pts → ~28.6/100
-        self.assertGreater(resultado.score_alcance, 25)
-        self.assertLess(resultado.score_alcance, 32)
+        # CONFIS (Feb 2026): territorial_default=5×3=15, 1 municipio=10, PDET=15
+        # Total = 40/100
+        self.assertGreater(resultado.score_alcance, 35)
+        self.assertLess(resultado.score_alcance, 45)
 
     def test_alcance_multiples_municipios(self):
         """Múltiples municipios deben aumentar score base"""

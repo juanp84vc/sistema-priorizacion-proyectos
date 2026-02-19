@@ -82,8 +82,8 @@ class TestMatrizPDET:
 
     def test_es_municipio_pdet(self, repo):
         """Verifica método es_municipio_pdet()"""
-        assert repo.es_municipio_pdet("ANTIOQUIA", "ABEJORRAL") is True
-        assert repo.es_municipio_pdet("CUNDINAMARCA", "BOGOTÁ") is False
+        assert repo.es_municipio_pdet("ABEJORRAL", "ANTIOQUIA") is True
+        assert repo.es_municipio_pdet("BOGOTÁ", "CUNDINAMARCA") is False
         print(f"\n✅ es_municipio_pdet() funciona correctamente")
 
     def test_get_sectores_ordenados(self, repo):
@@ -182,74 +182,79 @@ class TestProbabilidadConPDET:
         """Proyecto con sector de alta prioridad PDET debe tener score alto"""
         score = criterio.evaluar(proyecto_pdet_alta_prioridad)
 
-        # Con puntaje PDET=10 → Score = 100/100 (sin otros componentes)
-        # Esperamos score = 100 (probabilidad alta)
-        assert score == 100, f"Score esperado 100, obtenido: {score}"
+        # CONFIS (Feb 2026): Grupo 4 (PDET sin estruc.) = 70
+        # Territorial 5.0 (default) + Sectorial 10 = 15 → (15/20)*100 = 75
+        # Score = 70*0.20 + 75*0.80 = 14 + 60 = 74
+        assert score > 70, f"Score esperado >70, obtenido: {score}"
+        assert score < 80, f"Score esperado <80, obtenido: {score}"
 
         # Verificar metadata
         assert proyecto_pdet_alta_prioridad.tiene_municipios_pdet is True
         assert proyecto_pdet_alta_prioridad.puntaje_sectorial_max == 10
-        assert "Alcantarillado" in proyecto_pdet_alta_prioridad.puntajes_pdet
 
-        print(f"\n✅ Proyecto alta prioridad PDET:")
+        print(f"\n✅ Proyecto alta prioridad PDET (CONFIS):")
         print(f"   Score: {score:.1f}/100")
-        print(f"   Puntaje sectorial: {proyecto_pdet_alta_prioridad.puntaje_sectorial_max}/10")
+        print(f"   Grupo CONFIS: {proyecto_pdet_alta_prioridad.grupo_priorizacion_confis}")
         print(f"   Probabilidad: {criterio.score_a_probabilidad(score)}")
 
     def test_evaluacion_pdet_baja_prioridad(self, criterio, proyecto_pdet_baja_prioridad):
         """Proyecto con sector de baja prioridad PDET debe tener score más bajo"""
         score = criterio.evaluar(proyecto_pdet_baja_prioridad)
 
-        # Con puntaje PDET=3 → Score = 30/100 (basado solo en puntaje sectorial)
-        # Esperamos score = 30 (probabilidad baja)
-        assert score == 30, f"Score esperado 30, obtenido: {score}"
+        # CONFIS (Feb 2026): Grupo 4 = 70
+        # Territorial 5.0 (default) + Sectorial 3 = 8 → (8/20)*100 = 40
+        # Score = 70*0.20 + 40*0.80 = 14 + 32 = 46
+        assert score > 40, f"Score esperado >40, obtenido: {score}"
+        assert score < 55, f"Score esperado <55, obtenido: {score}"
 
         assert proyecto_pdet_baja_prioridad.tiene_municipios_pdet is True
         assert proyecto_pdet_baja_prioridad.puntaje_sectorial_max == 3
 
-        print(f"\n✅ Proyecto baja prioridad PDET:")
+        print(f"\n✅ Proyecto baja prioridad PDET (CONFIS):")
         print(f"   Score: {score:.1f}/100")
-        print(f"   Puntaje sectorial: {proyecto_pdet_baja_prioridad.puntaje_sectorial_max}/10")
+        print(f"   Grupo CONFIS: {proyecto_pdet_baja_prioridad.grupo_priorizacion_confis}")
         print(f"   Probabilidad: {criterio.score_a_probabilidad(score)}")
 
     def test_evaluacion_no_pdet(self, criterio, proyecto_no_pdet):
-        """Proyecto en municipio NO-PDET debe tener score 0 (no aplica a Obras por Impuestos)"""
+        """Proyecto en municipio NO-PDET obtiene score CONFIS con defaults neutros.
+        Nota: el gate de elegibilidad ahora está en el motor, no en el criterio."""
         score = criterio.evaluar(proyecto_no_pdet)
 
-        # Sin municipios PDET → Score = 0 (no puede usar mecanismo Obras por Impuestos)
-        assert score == 0, f"Score esperado 0, obtenido: {score}"
-        assert proyecto_no_pdet.tiene_municipios_pdet is False
-        assert proyecto_no_pdet.puntaje_sectorial_max is None
+        # CONFIS (Feb 2026): Sin datos en DB → defaults neutros
+        # Grupo 4 (PDET default) = 70, Territorial 5.0, Sectorial 5.0
+        # Score = 70*0.20 + ((5+5)/20)*100*0.80 = 14 + 40 = 54
+        # Nota: El gate de elegibilidad ahora se maneja en el motor,
+        # no en el criterio individual
+        assert score > 45, f"Score esperado >45, obtenido: {score}"
+        assert score < 60, f"Score esperado <60, obtenido: {score}"
 
-        print(f"\n✅ Proyecto NO-PDET:")
+        print(f"\n✅ Proyecto NO-PDET (score CONFIS con defaults):")
         print(f"   Score: {score:.1f}/100")
-        print(f"   Es PDET: {proyecto_no_pdet.tiene_municipios_pdet}")
-        print(f"   Probabilidad: {criterio.score_a_probabilidad(score)}")
-        print(f"   Nota: No aplica a mecanismo Obras por Impuestos (exclusivo PDET/ZOMAC)")
+        print(f"   Nota: Gate de elegibilidad se maneja en motor_arquitectura_c")
 
     def test_detalles_evaluacion(self, criterio, proyecto_pdet_alta_prioridad):
-        """Verifica método get_detalles_evaluacion()"""
+        """Verifica método get_detalles_evaluacion() con estructura CONFIS"""
         detalles = criterio.get_detalles_evaluacion(proyecto_pdet_alta_prioridad)
 
         assert "probabilidad_nivel" in detalles
         assert "score_total" in detalles
         assert "componentes" in detalles
-        assert "prioridad_sectorial_pdet" in detalles["componentes"]
-        assert "metadata" in detalles  # Metadata descriptiva (no afecta score)
+        # CONFIS (Feb 2026): 2 componentes: grupo_priorizacion + score_confis
+        assert "grupo_priorizacion" in detalles["componentes"]
+        assert "score_confis" in detalles["componentes"]
 
-        # Verificar que solo hay un componente (100% sectorial)
-        assert len(detalles["componentes"]) == 1
-        assert detalles["componentes"]["prioridad_sectorial_pdet"]["peso"] == 1.00
+        # Verificar estructura CONFIS
+        assert len(detalles["componentes"]) == 2
+        assert detalles["componentes"]["grupo_priorizacion"]["peso"] == 0.20
+        assert detalles["componentes"]["score_confis"]["peso"] == 0.80
 
-        print(f"\n✅ Detalles de evaluación:")
+        print(f"\n✅ Detalles de evaluación CONFIS:")
         print(f"   Nivel: {detalles['probabilidad_nivel']}")
         print(f"   Score total: {detalles['score_total']:.1f}")
-        print(f"   Componente único:")
-        comp_data = detalles["componentes"]["prioridad_sectorial_pdet"]
-        print(f"     - Prioridad sectorial PDET: {comp_data['score']:.1f} (peso {comp_data['peso']}) = {comp_data['ponderado']:.1f}")
-        print(f"   Metadata descriptiva (no afecta score):")
-        print(f"     - ODS: {detalles['metadata']['ods_vinculados']}")
-        print(f"     - Población: {detalles['metadata']['poblacion_objetivo']}")
+        grupo = detalles["componentes"]["grupo_priorizacion"]
+        confis = detalles["componentes"]["score_confis"]
+        print(f"   Grupo: {grupo['grupo']} ({grupo['nombre']})")
+        print(f"   Territorial: {confis['territorial']}, Sectorial: {confis['sectorial']}")
 
     def test_comparacion_alta_vs_baja_prioridad(
         self,
@@ -261,15 +266,17 @@ class TestProbabilidadConPDET:
         score_alta = criterio.evaluar(proyecto_pdet_alta_prioridad)
         score_baja = criterio.evaluar(proyecto_pdet_baja_prioridad)
 
-        # Alta prioridad (10/10) = 100, Baja prioridad (3/10) = 30
-        assert score_alta == 100, f"Score alta esperado 100, obtenido: {score_alta}"
-        assert score_baja == 30, f"Score baja esperado 30, obtenido: {score_baja}"
-        assert score_alta > score_baja
+        # CONFIS: Alta > Baja (sectorial 10 vs 3, mismo grupo)
+        assert score_alta > score_baja, (
+            f"Score alta ({score_alta}) debe ser > baja ({score_baja})"
+        )
 
         diferencia = score_alta - score_baja
-        print(f"\n✅ Comparación alta vs baja prioridad:")
-        print(f"   Alta (10/10): {score_alta:.1f} ({criterio.score_a_probabilidad(score_alta)})")
-        print(f"   Baja (3/10): {score_baja:.1f} ({criterio.score_a_probabilidad(score_baja)})")
+        assert diferencia > 15, f"Diferencia esperada >15, obtenida: {diferencia}"
+
+        print(f"\n✅ Comparación alta vs baja prioridad (CONFIS):")
+        print(f"   Alta: {score_alta:.1f} ({criterio.score_a_probabilidad(score_alta)})")
+        print(f"   Baja: {score_baja:.1f} ({criterio.score_a_probabilidad(score_baja)})")
         print(f"   Diferencia: {diferencia:.1f} puntos")
 
     def test_multiples_sectores(self, criterio):
@@ -291,16 +298,16 @@ class TestProbabilidadConPDET:
             sectores=["Salud", "Alcantarillado", "Educación"]  # Puntajes: 3, 10, 7
         )
 
-        criterio.evaluar(proyecto)
+        score = criterio.evaluar(proyecto)
 
-        # Debería usar puntaje MÁXIMO = 10 (Alcantarillado)
+        # CONFIS: Debería usar puntaje MÁXIMO = 10 (Alcantarillado)
         assert proyecto.puntaje_sectorial_max == 10
-        assert "Alcantarillado" in proyecto.puntajes_pdet
-        assert proyecto.puntajes_pdet["Alcantarillado"] == 10
+        # Verificar que score refleja el puntaje alto
+        assert score > 70, f"Score esperado >70 con sectorial=10, obtenido: {score}"
 
-        print(f"\n✅ Proyecto multi-sectorial:")
-        print(f"   Puntaje máximo: {proyecto.puntaje_sectorial_max}/10")
-        print(f"   Puntajes por sector: {proyecto.puntajes_pdet}")
+        print(f"\n✅ Proyecto multi-sectorial (CONFIS):")
+        print(f"   Puntaje máximo sectorial: {proyecto.puntaje_sectorial_max}/10")
+        print(f"   Score CONFIS: {score:.1f}")
 
     def test_score_a_probabilidad(self, criterio):
         """Verifica conversión de score a nivel de probabilidad"""

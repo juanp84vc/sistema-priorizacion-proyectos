@@ -5,20 +5,22 @@ Arquitectura C - Peso: 40% (DOMINANTE)
 Este criterio evalúa el retorno social de la inversión, que es la métrica
 MÁS IMPORTANTE para priorizar proyectos de valor compartido.
 
-Metodología:
-- Usa rangos aprobados 15 Nov 2025
-- SROI < 1.0 → Rechazo automático
-- SROI ≥ 3.0 → Prioridad alta
+Metodología (Ajuste Feb 2026):
+- Función logarítmica continua: Score = 60 + 35 × ln(SROI) / ln(3)
+- Elimina discontinuidades de rangos discretos
+- Gate de rechazo preservado: SROI < 1.0 → Score 0
+- Puntos de anclaje: SROI=1→60, SROI=2→82, SROI=3→95
+- Techo: 98 pts (evita distorsión por SROI extremos)
 - SROI > 7.0 → Alerta de verificación
 
-Referencias:
-- AUDITORIA_SROI_ACTUAL.md
-- PROPUESTA_SROI_DOMINANTE.md
-- Arquitectura C aprobada (15 Nov 2025)
+Historial:
+- Arquitectura C aprobada (15 Nov 2025) - rangos discretos
+- Ajuste metodológico (Feb 2026) - función logarítmica continua
 """
 
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
+import math
 import sys
 from pathlib import Path
 
@@ -45,17 +47,29 @@ class SROICriterio:
 
     Criterio: 40% del score total (Arquitectura C)
 
-    Conversión SROI → Score:
-    - < 1.0: 0 (RECHAZAR - destruye valor)
-    - 1.0-1.99: 60 (Prioridad Baja)
-    - 2.0-2.99: 80 (Prioridad Media)
-    - ≥ 3.0: 95 (Prioridad Alta)
+    Conversión SROI → Score (función logarítmica continua):
+    - < 1.0: 0 (RECHAZAR - destruye valor social)
+    - >= 1.0: Score = 60 + 35 × ln(SROI) / ln(3)
+    - Techo: 98 pts
+
+    Puntos de referencia:
+    - SROI 1.0 → 60 pts
+    - SROI 1.5 → 73 pts
+    - SROI 2.0 → 82 pts
+    - SROI 3.0 → 95 pts
+    - SROI 5.0 → 98 pts (techo)
 
     Gates de validación:
     - SROI < 1.0: Rechazo automático
     - SROI > 7.0: Alerta verificación metodológica
     - SROI > 5.0: Requiere observaciones obligatorias
     """
+
+    # Constantes de la función logarítmica
+    SCORE_BASE = 60.0       # Score en SROI = 1.0
+    SCORE_RANGO = 35.0      # Rango adicional (60 + 35 = 95 en SROI = 3.0)
+    LOG_REFERENCIA = math.log(3.0)  # ln(3) ≈ 1.0986
+    SCORE_TECHO = 98.0      # Techo máximo
 
     def __init__(self, peso: float = 0.40):
         """
@@ -154,13 +168,18 @@ class SROICriterio:
 
     def _convertir_sroi_a_score(self, sroi: float) -> float:
         """
-        Convierte valor SROI a score 0-100 usando rangos aprobados.
+        Convierte valor SROI a score 0-100 usando función logarítmica continua.
 
-        Rangos aprobados (15 Nov 2025):
-        - < 1.0: 0 (RECHAZAR)
-        - 1.0-1.99: 60 (Baja)
-        - 2.0-2.99: 80 (Media)
-        - ≥ 3.0: 95 (Alta)
+        Ajuste metodológico (Feb 2026):
+        - < 1.0: 0 (RECHAZAR - gate preservado)
+        - >= 1.0: Score = 60 + 35 × ln(SROI) / ln(3)
+        - Techo: 98 pts
+
+        Puntos de anclaje:
+        - SROI 1.0 → 60 (ln(1)=0, score=60+0=60)
+        - SROI 2.0 → 82.1
+        - SROI 3.0 → 95.0 (ln(3)/ln(3)=1, score=60+35=95)
+        - SROI 5.0+ → 98 (techo)
 
         Args:
             sroi: Valor SROI del proyecto
@@ -170,16 +189,22 @@ class SROICriterio:
         """
         if sroi < 1.0:
             return 0.0
-        elif sroi < 2.0:
-            return 60.0
-        elif sroi < 3.0:
-            return 80.0
-        else:  # sroi >= 3.0
-            return 95.0
+
+        # Función logarítmica continua
+        score = self.SCORE_BASE + self.SCORE_RANGO * math.log(sroi) / self.LOG_REFERENCIA
+
+        # Aplicar techo y piso
+        return min(max(score, 0.0), self.SCORE_TECHO)
 
     def get_nivel_prioridad(self, score: float) -> str:
         """
-        Determina nivel de prioridad basado en score.
+        Determina nivel de prioridad basado en score SROI.
+
+        Con función continua, los niveles usan rangos en vez de valores exactos:
+        - 0: RECHAZAR (SROI < 1.0)
+        - 1-69: BAJA (SROI ~1.0-1.7)
+        - 70-84: MEDIA (SROI ~1.7-2.5)
+        - 85+: ALTA (SROI ~2.5+)
 
         Args:
             score: Score 0-100
@@ -189,14 +214,12 @@ class SROICriterio:
         """
         if score == 0:
             return "RECHAZAR"
-        elif score == 60:
+        elif score < 70:
             return "BAJA"
-        elif score == 80:
+        elif score < 85:
             return "MEDIA"
-        elif score == 95:
-            return "ALTA"
         else:
-            return "DESCONOCIDO"
+            return "ALTA"
 
     def aplicar_peso(self, score: float) -> float:
         """

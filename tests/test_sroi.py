@@ -68,8 +68,13 @@ class TestSROICriterio(unittest.TestCase):
         self.assertEqual(score, 60.0)
 
     def test_sroi_1_a_2_score_60(self):
-        """SROI 1.0-1.99 debe retornar score 60 (BAJA)"""
-        for sroi_val in [1.0, 1.5, 1.99]:
+        """SROI 1.0-1.99 retorna scores logarítmicos (60-82)"""
+        test_cases = [
+            (1.0, 60.0),
+            (1.5, 72.9),
+            (1.99, 81.9)
+        ]
+        for sroi_val, expected_score in test_cases:
             with self.subTest(sroi=sroi_val):
                 proyecto = ProyectoSocial(
                     id=f"test-{sroi_val}",
@@ -87,11 +92,16 @@ class TestSROICriterio(unittest.TestCase):
                     departamentos=["Antioquia"]
                 )
                 score = self.criterio.evaluar(proyecto)
-                self.assertEqual(score, 60.0)
+                self.assertAlmostEqual(score, expected_score, places=1)
 
     def test_sroi_2_a_3_score_80(self):
-        """SROI 2.0-2.99 debe retornar score 80 (MEDIA)"""
-        for sroi_val in [2.0, 2.5, 2.99]:
+        """SROI 2.0-2.99 retorna scores logarítmicos (82-95)"""
+        test_cases = [
+            (2.0, 82.1),
+            (2.5, 89.2),
+            (2.99, 94.9)
+        ]
+        for sroi_val, expected_score in test_cases:
             with self.subTest(sroi=sroi_val):
                 proyecto = ProyectoSocial(
                     id=f"test-{sroi_val}",
@@ -109,11 +119,17 @@ class TestSROICriterio(unittest.TestCase):
                     departamentos=["Antioquia"]
                 )
                 score = self.criterio.evaluar(proyecto)
-                self.assertEqual(score, 80.0)
+                self.assertAlmostEqual(score, expected_score, places=1)
 
     def test_sroi_mayor_igual_3_score_95(self):
-        """SROI ≥ 3.0 debe retornar score 95 (ALTA)"""
-        for sroi_val in [3.0, 4.5, 6.0, 10.0]:
+        """SROI ≥ 3.0 retorna 95.0 (hasta techo en 98.0)"""
+        test_cases = [
+            (3.0, 95.0),
+            (4.5, 98.0),
+            (6.0, 98.0),
+            (10.0, 98.0)
+        ]
+        for sroi_val, expected_score in test_cases:
             with self.subTest(sroi=sroi_val):
                 proyecto = ProyectoSocial(
                     id=f"test-{sroi_val}",
@@ -131,7 +147,7 @@ class TestSROICriterio(unittest.TestCase):
                     departamentos=["Antioquia"]
                 )
                 score = self.criterio.evaluar(proyecto)
-                self.assertEqual(score, 95.0)
+                self.assertAlmostEqual(score, expected_score, places=1)
 
     # ========== TESTS DE GATES DE VALIDACIÓN ==========
 
@@ -160,7 +176,7 @@ class TestSROICriterio(unittest.TestCase):
         self.assertTrue(any("RECHAZADO" in alerta for alerta in resultado.alertas))
 
     def test_alerta_sroi_mayor_7(self):
-        """SROI > 7.0 debe generar alerta de verificación"""
+        """SROI > 7.0 debe generar alerta de verificación con score 98.0"""
         proyecto = ProyectoSocial(
             id="test-alerta",
             nombre="Test Alerta",
@@ -178,7 +194,7 @@ class TestSROICriterio(unittest.TestCase):
         )
         resultado = self.criterio.evaluar_detallado(proyecto)
 
-        self.assertEqual(resultado.score, 95.0)  # Score sigue siendo 95
+        self.assertEqual(resultado.score, 98.0)  # Techo de 98.0
         self.assertEqual(resultado.nivel, "VERIFICAR")
         self.assertTrue(resultado.requiere_observaciones)
         self.assertTrue(
@@ -268,7 +284,7 @@ class TestSROICriterio(unittest.TestCase):
     # ========== TESTS DE VALIDACIÓN ==========
 
     def test_error_sroi_no_definido(self):
-        """Debe lanzar error si SROI no está definido"""
+        """Sin SROI definido, usa valor por defecto 1.5 (score ~72.9)"""
         proyecto = ProyectoSocial(
             id="test-sin-sroi",
             nombre="Test Sin SROI",
@@ -284,9 +300,9 @@ class TestSROICriterio(unittest.TestCase):
             poblacion_objetivo="General",
             departamentos=["Antioquia"]
         )
-        with self.assertRaises(ValueError) as context:
-            self.criterio.evaluar(proyecto)
-        self.assertIn("SROI no definido", str(context.exception))
+        # Ahora retorna score con valor por defecto (1.5)
+        score = self.criterio.evaluar(proyecto)
+        self.assertAlmostEqual(score, 72.9, places=1)
 
     def test_error_sroi_negativo(self):
         """Debe lanzar error si SROI es negativo"""
@@ -360,13 +376,13 @@ class TestSROICriterio(unittest.TestCase):
         contribucion_vieja = 3.56
 
         # Nueva contribución debe ser ~10x mayor
-        self.assertEqual(score_nuevo, 95.0)
-        self.assertEqual(contribucion_nueva, 38.0)
+        self.assertEqual(score_nuevo, 98.0)  # Techo de 98.0
+        self.assertEqual(contribucion_nueva, 39.2)  # 98.0 × 0.40
         self.assertGreater(contribucion_nueva / contribucion_vieja, 10)
 
-        # Diferencia: 38 - 3.56 = 34.44 puntos más
+        # Diferencia: 39.2 - 3.56 = 35.64 puntos más
         diferencia = contribucion_nueva - contribucion_vieja
-        self.assertAlmostEqual(diferencia, 34.44, delta=0.5)
+        self.assertAlmostEqual(diferencia, 35.64, delta=0.5)
 
     # ========== TESTS DE NIVELES DE PRIORIDAD ==========
 
