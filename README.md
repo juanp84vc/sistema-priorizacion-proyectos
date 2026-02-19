@@ -1,478 +1,299 @@
-# Sistema de Priorización de Proyectos Sociales
+# Sistema de Priorización de Proyectos Sociales — ENLAZA GEB
 
-Sistema modular y extensible para evaluar y priorizar proyectos de inversión social siguiendo **estrictamente los principios SOLID**.
+Sistema modular y extensible para evaluar y priorizar proyectos de inversión social para el mecanismo de Obras por Impuestos, siguiendo los principios SOLID y la metodología CONFIS (Consejo Superior de Política Fiscal).
 
-## 🎯 Características
+## Características principales
 
-### 🎯 Sistema de Priorización Arquitectura C
+- **Arquitectura C con CONFIS integrado**: Scoring multi-criterio calibrado con datos oficiales del gobierno colombiano
+- **SROI Logarítmico (40%)**: Función continua log₁₀ que elimina discontinuidades y premia proporcionalmente
+- **Datos oficiales PDET/ZOMAC**: Matriz gubernamental de 362 municipios × 10 sectores en SQLite
+- **Metodología CONFIS completa**: 8 grupos de priorización, puntajes territoriales y sectoriales
+- **Gate de elegibilidad**: Solo municipios PDET/ZOMAC/Amazonía elegibles para Obras por Impuestos
+- **Rúbricas objetivas**: Criterios verificables que reducen variabilidad inter-evaluador de ~45 a ~10 puntos
+- **134 tests passing**: Cobertura completa de todos los criterios y el motor de scoring
+- **Validado con datos reales**: 4 proyectos ENLAZA en prefactibilidad
 
-- **SROI Dominante (40%):** Criterio principal de evaluación con impacto 10.7x mayor
-- **Datos Oficiales PDET/ZOMAC:** Matriz gubernamental de 362 municipios × 10 sectores
-- **Scoring Automático:** Motor integrado con validaciones y alertas
-- **Validado con Datos Reales:** 4 proyectos ENLAZA en prefactibilidad
-- **50 Tests Passing:** Calidad asegurada (100%)
-
-### 🏗️ Arquitectura SOLID
-
-- ✅ Evaluación multi-criterio configurable
-- ✅ Múltiples estrategias de scoring
-- ✅ Extensible sin modificar código existente (OCP)
-- ✅ Componentes intercambiables (LSP)
-- ✅ Fácil agregar nuevos criterios
-- ✅ Arquitectura basada en abstracciones (DIP)
-- ✅ 100% Python type-safe
-
-## 📦 Instalación
+## Instalación
 
 ```bash
-cd /Users/juanpablotovar/Desktop/claude_code/sistema-priorizacion-proyectos
 pip install -r requirements.txt
 ```
 
-## 🚀 Uso Rápido
+## Uso rápido
 
 ```python
-from src.models.proyecto import ProyectoSocial, AreaGeografica, EstadoProyecto
-from src.criterios import (
-    CostoEfectividadCriterio,
-    ContribucionStakeholdersCriterio,
-    ProbabilidadAprobacionCriterio,
-    RiesgosCriterio
+from src.scoring.motor_arquitectura_c import MotorArquitecturaC
+from src.models.proyecto import ProyectoSocial, AreaGeografica
+
+# Crear proyecto
+proyecto = ProyectoSocial(
+    id="P001",
+    nombre="Alcantarillado Rural Abejorral",
+    organizacion="ENLAZA GEB",
+    descripcion="Mejoramiento de alcantarillado en zona PDET",
+    beneficiarios_directos=500,
+    beneficiarios_indirectos=2000,
+    duracion_meses=12,
+    presupuesto_total=100_000_000,
+    sroi=3.5,
+    ods_vinculados=["6", "11"],
+    area_geografica=AreaGeografica.RURAL,
+    poblacion_objetivo="Comunidades rurales",
+    departamentos=["ANTIOQUIA"],
+    municipios=["ABEJORRAL"],
+    sectores=["Alcantarillado"]
 )
-from src.estrategias.scoring_ponderado import ScoringPonderado
-from src.servicios.sistema_priorizacion import SistemaPriorizacionProyectos
 
-# Configurar sistema
-sistema = SistemaPriorizacionProyectos(
-    criterios=[
-        CostoEfectividadCriterio(peso=0.25),
-        ContribucionStakeholdersCriterio(peso=0.25),
-        ProbabilidadAprobacionCriterio(peso=0.25),
-        RiesgosCriterio(peso=0.25)
-    ],
-    estrategia=ScoringPonderado()
-)
+# Evaluar
+motor = MotorArquitecturaC(db_path="data/proyectos.db")
+resultado = motor.evaluar_proyecto(proyecto)
 
-# Evaluar proyectos
-resultados = sistema.priorizar_cartera(proyectos)
-
-for resultado in resultados:
-    print(f"{resultado.proyecto_nombre}: {resultado.score_final:.2f}")
-    print(f"  Recomendación: {resultado.recomendacion}")
+print(f"Score: {resultado['score_total']:.1f}/100")
+print(f"Nivel: {resultado['nivel_prioridad']}")
+print(f"Alertas: {resultado['alertas']}")
 ```
 
-## 🏗️ Arquitectura SOLID
+## Arquitectura del Scoring
 
-### Single Responsibility Principle (SRP)
-Cada criterio tiene UNA sola responsabilidad:
-- `CostoEfectividadCriterio`: Solo evalúa relación costo-efectividad
-- `ContribucionStakeholdersCriterio`: Solo evalúa contribución a stakeholders
-- `ProbabilidadAprobacionCriterio`: Solo evalúa probabilidad de aprobación gubernamental
-- `RiesgosCriterio`: Solo evalúa riesgos del proyecto
-
-### Open/Closed Principle (OCP)
-Extensible sin modificación:
-```python
-# Agregar nuevo criterio SIN modificar código existente
-class InnovacionCriterio(CriterioEvaluacion):
-    def evaluar(self, proyecto):
-        # Nueva lógica de evaluación
-        pass
-```
-
-### Liskov Substitution Principle (LSP)
-Todos los criterios son intercambiables:
-```python
-# Cualquier criterio funciona igual
-for criterio in criterios:
-    score = criterio.evaluar(proyecto)  # Siempre funciona
-```
-
-### Interface Segregation Principle (ISP)
-Interfaces mínimas y focalizadas:
-- `CriterioEvaluacion`: Solo métodos esenciales (`evaluar`, `get_nombre`, `get_descripcion`)
-- No forzamos métodos innecesarios
-
-### Dependency Inversion Principle (DIP)
-Dependemos de abstracciones:
-```python
-# Sistema depende de abstracción, no implementación
-def __init__(self, criterios: List[CriterioEvaluacion]):
-    # Funciona con CUALQUIER criterio que implemente la interfaz
-```
-
-## 📂 Estructura del Proyecto
+**Fórmula principal — Arquitectura C v2.1:**
 
 ```
-sistema-priorizacion-proyectos/
-├── src/
-│   ├── models/              # Modelos de dominio
-│   │   ├── proyecto.py      # ProyectoSocial, AreaGeografica, EstadoProyecto
-│   │   └── evaluacion.py    # ResultadoEvaluacion
-│   ├── criterios/           # Criterios de evaluación
-│   │   ├── base.py          # Abstracción base (DIP)
-│   │   ├── costo_efectividad.py
-│   │   ├── stakeholders.py
-│   │   ├── probabilidad_aprobacion.py
-│   │   └── riesgos.py
-│   ├── estrategias/         # Estrategias de scoring
-│   │   ├── base.py
-│   │   ├── scoring_ponderado.py
-│   │   └── scoring_umbral.py
-│   └── servicios/           # Servicios de aplicación
-│       └── sistema_priorizacion.py
-├── tests/                   # Tests unitarios
-├── data/                    # Datos de ejemplo
-├── main.py                  # Ejemplos de uso
-├── requirements.txt
-└── README.md
+Score_Final = SROI(40%) + Stakeholders(25%) + Prob.CONFIS(20%) + Riesgos(15%)
 ```
 
-## 📊 Criterios de Evaluación - Arquitectura C
-
-**Sistema de Scoring:** Score Final = Σ(Score_criterio × Peso)
-
-### 1. Social Return on Investment - SROI (40%) ⭐ DOMINANTE
-
-**Criterio más importante del sistema**
-
-- **Descripción:** Evalúa el retorno social de la inversión, midiendo cuánto valor social se genera por cada peso invertido
-- **Metodología:** Conversión SROI → Score según rangos aprobados
-- **Rangos de conversión:**
-  - SROI < 1.0: Score 0 (RECHAZADO - destruye valor social)
-  - SROI 1.0-1.99: Score 60 (Prioridad BAJA - retorno marginal)
-  - SROI 2.0-2.99: Score 80 (Prioridad MEDIA - retorno aceptable)
-  - SROI ≥ 3.0: Score 95 (Prioridad ALTA - retorno excelente)
-- **Gates de validación:**
-  - Rechazo automático: SROI < 1.0
-  - Alerta verificación: SROI > 7.0 (requiere validación metodológica)
-  - Observaciones obligatorias: SROI > 5.0
-- **Peso:** 40% (10.6x más impacto vs sistema anterior)
-- **Implementación:** `src/criterios/sroi.py`
-
-### 2. Contribución al Relacionamiento con Stakeholders (25%)
-
-- **Descripción:** Mide contribución al relacionamiento con stakeholders locales y viabilidad operativa
-- **Factores evaluados:**
-  - Alcance geográfico (departamentos, municipios)
-  - Cobertura de beneficiarios (directos e indirectos)
-  - Fortalecimiento de relaciones institucionales
-  - Viabilidad operativa
-- **Score alto indica:** Fuerte relacionamiento y alta viabilidad operativa
-- **Peso:** 25%
-- **Estado:** Cálculo temporal (reimplementación pendiente)
-
-### 3. Probabilidad de Aprobación - Obras por Impuestos (20%)
-
-**Con datos oficiales PDET/ZOMAC**
-
-- **Descripción:** Evalúa probabilidad de aprobación en mecanismo Obras por Impuestos usando matriz oficial de priorización sectorial
-- **Metodología:** 100% basado en datos oficiales gubernamentales
-- **Componentes:**
-  - Prioridad sectorial PDET/ZOMAC (100% del criterio)
-  - Matriz oficial: 362 municipios × 10 sectores
-  - Puntajes sectoriales: 1-10 (10 = máxima prioridad)
-- **Scoring:**
-  - Municipios PDET: Score = (Puntaje_sectorial / 10) × 100
-  - Municipios NO-PDET: Score = 0 (no elegibles para Obras por Impuestos)
-- **Sectores evaluados:**
-  1. Educación
-  2. Salud
-  3. Alcantarillado
-  4. Vía (Infraestructura vial)
-  5. Energía
-  6. Banda Ancha (Conectividad)
-  7. Riesgo Ambiental
-  8. Infraestructura Rural
-  9. Cultura
-  10. Deporte
-- **Peso:** 20%
-- **Implementación:** `src/criterios/probabilidad_aprobacion_pdet.py`
-- **Datos:** `data/proyectos.db` (tabla matriz_pdet_zomac)
-
-### 4. Evaluación de Riesgos (15%)
-
-- **Descripción:** Analiza riesgos del proyecto en múltiples dimensiones
-- **Tipos de riesgo evaluados:**
-  - Tecnológicos
-  - Regulatorios
-  - Financieros
-  - Sociales
-  - Operativos
-- **Factores considerados:**
-  - Complejidad presupuestaria
-  - Duración del proyecto
-  - Alcance geográfico
-  - Características población objetivo
-- **Score alto:** Bajo riesgo (escala inversa)
-- **Peso:** 15%
-- **Estado:** Cálculo temporal (reimplementación pendiente)
-
----
-
-## 🎯 Cambios vs Sistema Anterior
-
-| Criterio | Peso Anterior | Peso Arquitectura C | Cambio |
-|----------|---------------|---------------------|--------|
-| **SROI** | 3.75% | **40%** | **+36.25%** 🚀 |
-| Costo-Efectividad | 25% | **0%** | **ELIMINADO** ❌ |
-| Stakeholders | 25% | 25% | Sin cambio |
-| Prob. Aprobación | 25% | 20% | -5% |
-| Riesgos | 25% | 15% | -10% |
-
-### Impacto Demostrado
-
-**Proyecto transformacional (SROI 4.2 + PDET alta prioridad):**
-- Sistema anterior: 60/100 (prioridad MEDIA)
-- Arquitectura C: 92.2/100 (prioridad MUY ALTA)
-- **Mejora: +32 puntos (+53%)** 🎯
-
-**Factor de incremento SROI:**
-- Contribución anterior: 3.56 puntos (3.75% peso)
-- Contribución nueva: 38.0 puntos (40% peso)
-- **Factor: 10.7x más impacto** 🚀
-
----
-
-## 📈 Motor de Scoring
-
-### Fórmula de Cálculo
-```python
-Score_Final = (
-    SROI × 40% +
-    Stakeholders × 25% +
-    Probabilidad_Aprobación × 20% +
-    Riesgos × 15%
-)
-```
-
-### Niveles de Prioridad
+### Niveles de prioridad
 
 | Score | Nivel | Descripción |
 |-------|-------|-------------|
 | 0 | RECHAZADO | SROI < 1.0 (destruye valor social) |
-| 1-49 | BAJA | Retorno limitado, alto riesgo |
-| 50-69 | MEDIA | Retorno aceptable, riesgo moderado |
-| 70-84 | ALTA | Retorno excelente, bajo riesgo |
-| 85-100 | MUY ALTA | Retorno excepcional, muy bajo riesgo |
-
-### Implementación
-
-**Motor principal:** `src/scoring/motor_arquitectura_c.py`
-```python
-from src.scoring.motor_arquitectura_c import calcular_score_proyecto
-
-# Calcular score de un proyecto
-resultado = calcular_score_proyecto(proyecto)
-
-# Resultado incluye:
-# - score_total: 0-100
-# - Scores individuales por criterio
-# - Contribuciones (score × peso)
-# - nivel_prioridad: MUY ALTA, ALTA, MEDIA, BAJA, RECHAZADO
-# - Alertas y recomendaciones
-```
+| 0 | NO ELEGIBLE | Municipio fuera de PDET/ZOMAC/Amazonía |
+| 1–49 | BAJA | Retorno limitado o alto riesgo |
+| 50–69 | MEDIA | Retorno aceptable, riesgo moderado |
+| 70–84 | ALTA | Retorno excelente, bajo riesgo |
+| 85–100 | MUY ALTA | Retorno excepcional, muy bajo riesgo |
 
 ---
 
-## ✅ Estado de Implementación
+## Criterios de evaluación
+
+### 1. SROI — Social Return on Investment (40%)
+
+Criterio dominante del sistema. Usa una función logarítmica continua que elimina los saltos discretos del modelo anterior.
+
+**Fórmula:**
+```
+Score = min(100, max(0, 28.43 × log₁₀(SROI) + 60))
+```
+
+Esto produce una curva suave donde SROI=1.0→60, SROI=3.0→73.6, SROI=10.0→88.4, SROI=30.0→102→cap 100.
+
+**Gates de validación:**
+- Rechazo automático si SROI < 1.0 (score=0, nivel=RECHAZADO)
+- Alerta de verificación si SROI > 7.0 (requiere validación metodológica)
+- Observaciones obligatorias si SROI > 5.0
+
+**Implementación:** `src/criterios/sroi.py`
+
+### 2. Stakeholders — Relacionamiento y Pertinencia Operacional (25%)
+
+Evalúa la contribución del proyecto al relacionamiento con comunidades y la pertinencia para las operaciones de ENLAZA.
+
+**Componentes:**
+- Pertinencia operacional (40%): Escala 1-5 con rúbricas verificables
+- Mejora del relacionamiento (35%): Escala 1-5 con criterios documentados
+- Alcance territorial (15%): Puntaje territorial CONFIS ×3 (max 30) + municipios ×10 (max 30) + bonus PDET (+15) + multi-departamento (+15) + corredor transmisión (+10) = max 100
+- Stakeholders involucrados (10%): Tipos de actores (autoridades, líderes, comunidades indígenas, etc.)
+
+**Implementación:** `src/criterios/stakeholders.py`
+
+### 3. Probabilidad de Aprobación CONFIS (20%)
+
+Evalúa la probabilidad de aprobación del proyecto en el mecanismo de Obras por Impuestos usando la metodología oficial del CONFIS (Anexo 2).
+
+**Gate de elegibilidad:** Solo proyectos en municipios PDET, ZOMAC o Amazonía son elegibles. Los demás obtienen score=0 y nivel "NO ELEGIBLE".
+
+**Fórmula CONFIS:**
+```
+Score = GrupoPriorización × 20% + ScoreCONFIS × 80%
+ScoreCONFIS = ((PuntajeTerritorial + PuntajeSectorial) / 20) × 100
+```
+
+**8 grupos de priorización (Anexo 2 CONFIS):**
+
+| Grupo | Descripción | Puntaje base |
+|-------|-------------|-------------|
+| 1 | PATR-PDET con estructuración OxI | 100 |
+| 2 | PATR-PDET sin estructuración | 90 |
+| 3 | PDET con estructuración OxI | 80 |
+| 4 | PDET sin estructuración | 70 |
+| 5 | ZOMAC con estructuración OxI | 60 |
+| 6 | ZOMAC sin estructuración | 50 |
+| 7 | Amazonía con estructuración OxI | 40 |
+| 8 | Amazonía sin estructuración | 30 |
+
+**Puntaje territorial:** Promedio de IPM, MDM inverso, IICA y CULTIVOS (1-10).
+**Puntaje sectorial:** Prioridad del sector en el municipio según matriz PDET (1-10).
+
+**Implementación:** `src/criterios/probabilidad_aprobacion_pdet.py`
+
+### 4. Evaluación de Riesgos (15%)
+
+Evalúa riesgos en múltiples dimensiones con sistema de alertas integrado al motor.
+
+**Dimensiones:** Tecnológicos, regulatorios, financieros, sociales, operativos. La escala es inversa (score alto = bajo riesgo).
+
+**Alertas del motor:**
+- ⚠️ Presupuesto > $500M → riesgo financiero elevado
+- ⚠️ Duración > 36 meses → riesgo operativo elevado
+- ⚠️ Sin stakeholders específicos → revisar pertinencia
+
+**Implementación:** `src/criterios/riesgos.py`
+
+---
+
+## Estructura del proyecto
+
+```
+sistema-priorizacion-proyectos/
+├── src/
+│   ├── models/
+│   │   ├── proyecto.py                      # ProyectoSocial con campos CONFIS
+│   │   └── evaluacion.py                    # ResultadoEvaluacion
+│   ├── criterios/
+│   │   ├── base.py                          # Abstracción base (DIP)
+│   │   ├── sroi.py                          # SROI logarítmico (40%)
+│   │   ├── stakeholders.py                  # Stakeholders con rúbricas (25%)
+│   │   ├── probabilidad_aprobacion_pdet.py  # Prob. CONFIS (20%)
+│   │   └── riesgos.py                       # Riesgos con alertas (15%)
+│   ├── scoring/
+│   │   └── motor_arquitectura_c.py          # Motor principal + gate elegibilidad
+│   ├── database/
+│   │   └── matriz_pdet_repository.py        # Repositorio SQLite PDET/ZOMAC
+│   ├── estrategias/
+│   │   ├── base.py
+│   │   ├── scoring_ponderado.py
+│   │   └── scoring_umbral.py
+│   └── servicios/
+│       └── sistema_priorizacion.py
+├── tests/
+│   ├── test_sroi.py                         # 28 tests SROI
+│   ├── test_motor_arquitectura_c.py         # 13 tests motor + gate
+│   ├── test_matriz_pdet.py                  # 17 tests PDET + CONFIS
+│   ├── test_stakeholders.py                 # Tests stakeholders + territorial
+│   └── ...                                  # Tests adicionales
+├── data/
+│   └── proyectos.db                         # SQLite: matriz_pdet_zomac (362 municipios)
+├── Priorizacion_Proyectos_ENLAZA_GEB.xlsx   # Excel operativo con fórmulas CONFIS
+├── Dashboard_Priorizacion_ENLAZA_GEB.html   # Dashboard interactivo
+├── Guia_Operativa_Evaluadores_ENLAZA_GEB.docx  # Guía para evaluadores
+├── main.py
+├── requirements.txt
+├── README.md
+└── README_APP.md                            # Documentación app Streamlit
+```
+
+## Estado de implementación
 
 | Componente | Estado | Tests |
 |------------|--------|-------|
-| SROI (40%) | ✅ Completado | 28/28 ✅ |
-| Prob. Aprobación (20%) | ✅ Completado | 15/15 ✅ |
-| Matriz PDET/ZOMAC | ✅ Cargada | 362 municipios ✅ |
-| Motor Arquitectura C | ✅ Integrado | 7/7 ✅ |
-| Stakeholders (25%) | ⏳ Temporal | - |
-| Riesgos (15%) | ⏳ Temporal | - |
+| SROI logarítmico (40%) | ✅ Completado | 28/28 |
+| Stakeholders con rúbricas (25%) | ✅ Completado | Tests integrados |
+| Prob. CONFIS (20%) | ✅ Completado | 17/17 |
+| Riesgos con alertas (15%) | ✅ Completado | Tests integrados |
+| Motor Arquitectura C + Gate | ✅ Completado | 13/13 |
+| Matriz PDET/ZOMAC | ✅ Cargada | 362 municipios |
+| Excel operativo | ✅ Actualizado | Fórmulas CONFIS |
+| Dashboard HTML | ✅ Actualizado | CONFIS integrado |
+| Guía Operativa | ✅ Actualizada | CONFIS documentado |
 
-**Tests totales:** 50/50 passing (100%)
-
-**Validación:** 4 proyectos ENLAZA reales (prefactibilidad)
-
-**Estado:** ✅ EN PRODUCCIÓN
-
-## 🎲 Estrategias de Scoring
-
-### Scoring Ponderado
-Score final = suma de scores ponderados de cada criterio
-
-### Scoring con Umbral
-Requiere que todos los criterios superen un umbral mínimo.
-Si alguno está bajo el umbral, se aplica penalización.
-
-## 📚 Documentación Técnica
-
-### Arquitectura del Sistema
-
-- **[SESSION_SUMMARY.md](SESSION_SUMMARY.md)**: Resumen completo de 5 sesiones de desarrollo (15-16 Nov 2025)
-- **[VALIDACION_PROYECTOS_REALES.md](VALIDACION_PROYECTOS_REALES.md)**: Validación con 4 proyectos ENLAZA reales
-- **[scripts/README_VALIDACION.md](scripts/README_VALIDACION.md)**: Guía del script de validación interactiva
-
-### Referencias
-
-- **Arquitectura C aprobada:** 15 Noviembre 2025
-- **Implementación:** 15-16 Noviembre 2025 (8 horas, 5 sesiones)
-- **Validación con proyectos reales:** 16 Noviembre 2025
-- **Versión:** 1.0 (Production-ready)
-- **Tests:** 50/50 passing (100%)
+**Tests totales:** 134/134 passing (100%)
 
 ---
 
-## 📝 Ejemplo Completo
+## Entregables
 
-Ver `main.py` para ejemplos completos de uso con datos reales.
+1. **Excel operativo** (`Priorizacion_Proyectos_ENLAZA_GEB.xlsx`): Hojas de registro, evaluación detallada, catálogos, panel de control, instrucciones, y hoja "Metodología CONFIS" con documentación completa de los 8 grupos, fórmulas, y ejemplos de cálculo.
+
+2. **Dashboard interactivo** (`Dashboard_Priorizacion_ENLAZA_GEB.html`): Visualización de proyectos con gráficos radar, barras comparativas, tabla de resultados, y scoring CONFIS integrado. Se abre directamente en el navegador.
+
+3. **Guía operativa** (`Guia_Operativa_Evaluadores_ENLAZA_GEB.docx`): Documento para evaluadores con instrucciones paso a paso, escalas de evaluación con rúbricas verificables, y la nueva metodología CONFIS.
+
+4. **Motor Python** (`src/`): Implementación completa en Python con arquitectura SOLID, 134 tests, y base de datos SQLite con datos oficiales PDET/ZOMAC.
+
+---
+
+## Historial de cambios
+
+### Fase 2 — Integración CONFIS (Feb 2026)
+
+**Cambio A: Gate de elegibilidad PDET/ZOMAC**
+- Propiedad `es_elegible_oxi` en ProyectoSocial
+- Motor asigna score=0, nivel="NO ELEGIBLE" a municipios fuera de PDET/ZOMAC/Amazonía
+- Alerta explícita: "Proyecto NO ELEGIBLE para Obras por Impuestos"
+
+**Cambio B: Criterio 3 reescrito con lógica CONFIS**
+- Reemplaza scoring simple (puntaje sectorial / 10 × 100) con fórmula oficial del Anexo 2
+- 8 grupos de priorización con puntajes base 30-100
+- Score = GrupoPriorización×20% + ScoreCONFIS×80%
+- Puntaje territorial (IPM+MDM+IICA+CULTIVOS) y sectorial (1-10)
+
+**Cambio C: Alcance Territorial con puntaje CONFIS**
+- Reemplaza bonus binario PDET (+20) con puntaje territorial CONFIS ×3 (max 30)
+- Nueva distribución: territorial(30) + municipios(30) + PDET(15) + multi-depto(15) + corredor(10) = 100
+
+### Fase 1 — Arquitectura C (Nov 2025)
+
+- Implementación inicial con 4 criterios y pesos calibrados
+- SROI logarítmico continuo (reemplaza rangos discretos)
+- Rúbricas objetivas para Pertinencia y Relacionamiento
+- Conversión de Riesgos de input directo a sistema de alertas
+- Integración de matriz PDET/ZOMAC en SQLite
+- Validación con 4 proyectos ENLAZA reales
+
+---
+
+## Testing
 
 ```bash
-python main.py
-```
-
-## 🧪 Testing
-
-```bash
-# Ejecutar tests
+# Ejecutar todos los tests
 pytest tests/ -v
 
 # Con coverage
 pytest tests/ --cov=src --cov-report=html
+
+# Solo tests CONFIS
+pytest tests/test_matriz_pdet.py -v
+
+# Solo motor de scoring
+pytest tests/test_motor_arquitectura_c.py -v
 ```
 
-## 🔧 Extensión del Sistema
+## Arquitectura SOLID
 
-### Agregar Nuevo Criterio
+El sistema sigue estrictamente los principios SOLID, permitiendo agregar nuevos criterios sin modificar código existente:
 
 ```python
-# 1. Crear nueva clase que herede de CriterioEvaluacion
 from src.criterios.base import CriterioEvaluacion
 
-class TransparenciaCriterio(CriterioEvaluacion):
-    def evaluar(self, proyecto: ProyectoSocial) -> float:
-        # Tu lógica aquí
-        return score
+class NuevoCriterio(CriterioEvaluacion):
+    def evaluar(self, proyecto):
+        return score  # 0-100
 
-    def get_nombre(self) -> str:
-        return "Transparencia"
+    def get_nombre(self):
+        return "Nuevo Criterio"
 
-    def get_descripcion(self) -> str:
-        return "Evalúa nivel de transparencia y rendición de cuentas"
-
-# 2. Usar sin modificar código existente
-sistema = SistemaPriorizacionProyectos(
-    criterios=[
-        # ... criterios existentes ...
-        TransparenciaCriterio(peso=0.15)  # ¡Funciona!
-    ],
-    estrategia=ScoringPonderado()
-)
+    def get_descripcion(self):
+        return "Descripción del criterio"
 ```
 
-### Agregar Nueva Estrategia de Scoring
+Cada criterio tiene una sola responsabilidad (SRP), todos son intercambiables a través de la interfaz base (LSP), y el sistema depende de abstracciones, no de implementaciones concretas (DIP).
 
-```python
-from src.estrategias.base import EstrategiaScoring
+## Despliegue Streamlit
 
-class ScoringMultiplicativo(EstrategiaScoring):
-    def calcular_score(self, proyecto, evaluaciones):
-        # Multiplica scores en lugar de sumarlos
-        score = 100
-        for eval_data in evaluaciones.values():
-            score *= (eval_data['score_base'] / 100)
-        return score * 100
-
-# Usar
-sistema.estrategia = ScoringMultiplicativo()
-```
-
-## 🎯 Casos de Uso
-
-1. **Fundaciones**: Priorizar propuestas de proyectos sociales
-2. **ONGs**: Evaluar impacto de programas
-3. **Gobierno**: Asignar recursos a proyectos comunitarios
-4. **Empresas**: Programas de responsabilidad social empresarial
-5. **Academia**: Evaluar proyectos de extensión
-
-## 📖 Documentación Adicional
-
-- Cada archivo tiene docstrings completos
-- Los principios SOLID están documentados en el código
-- Ver comentarios inline para detalles de implementación
-
-## 🤝 Contribuir
-
-Este proyecto sigue estrictamente los principios SOLID. Cualquier contribución debe:
-1. Mantener responsabilidad única (SRP)
-2. Ser extensible sin modificación (OCP)
-3. Respetar contratos de interfaces (LSP)
-4. Mantener interfaces mínimas (ISP)
-5. Depender de abstracciones (DIP)
-
-## 📝 Licencia
-
-MIT - Código educativo para proyectos de valor compartido
-
-## ✨ Autor
-
-Desarrollado como ejemplo de aplicación de principios SOLID en proyectos de ciencia de datos e inversión social.
+Ver `README_APP.md` para instrucciones de despliegue de la aplicación web en Streamlit Cloud.
 
 ---
 
-**⚠️ Nota**: Este sistema está diseñado con fines educativos y como plantilla para proyectos reales.
-Para uso en producción, se recomienda agregar:
-- Persistencia en base de datos
-- API REST para integración
-- Interfaz web de usuario
-- Sistema de autenticación
-- Logs y monitoreo
-- Tests de integración completos
-
-
-## 🌐 Despliegue en Streamlit Cloud
-
-### Requisitos previos
-1. Cuenta en [Streamlit Cloud](https://streamlit.io/cloud)
-2. Repositorio en GitHub con este código
-3. API Keys configuradas (Google Gemini, Claude, etc.)
-
-### Pasos para desplegar:
-
-1. **Subir código a GitHub:**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin https://github.com/TU_USUARIO/TU_REPO.git
-   git push -u origin main
-   ```
-
-2. **Configurar en Streamlit Cloud:**
-   - Ve a [share.streamlit.io](https://share.streamlit.io)
-   - Conecta tu repositorio de GitHub
-   - Selecciona el archivo `app.py`
-   - En **Advanced settings** → **Secrets**, agrega:
-     ```toml
-     GOOGLE_API_KEY = "tu_api_key_de_google"
-     ANTHROPIC_API_KEY = "tu_api_key_de_claude"
-     OPENAI_API_KEY = "tu_api_key_de_openai"
-     LLM_PROVIDER = "gemini"
-     ```
-
-3. **Deploy!**
-   - Haz clic en "Deploy"
-   - La aplicación estará disponible en: `https://TU_APP.streamlit.app`
-
-### Variables de entorno necesarias:
-
-| Variable | Descripción | Requerida |
-|----------|-------------|-----------|
-| `GOOGLE_API_KEY` | API Key de Google Gemini | Sí (si usas Gemini) |
-| `ANTHROPIC_API_KEY` | API Key de Claude | Sí (si usas Claude) |
-| `OPENAI_API_KEY` | API Key de OpenAI | Sí (si usas ChatGPT) |
-| `LLM_PROVIDER` | Proveedor por defecto: `gemini`, `claude`, o `openai` | Sí |
-
-### Notas importantes para producción:
-
-- ⚠️ **Base de datos**: En producción, considera usar PostgreSQL en lugar de SQLite
-- 🔒 **Seguridad**: Nunca subas archivos `.env` a GitHub
-- 📊 **Límites**: Streamlit Cloud tiene límites de recursos gratuitos
-- 💾 **Persistencia**: Los archivos guardados pueden perderse en reinicios (usa almacenamiento externo para producción)
-
+**Versión:** 2.1 (Arquitectura C + CONFIS)
+**Tests:** 134/134 passing
+**Última actualización:** Febrero 2026

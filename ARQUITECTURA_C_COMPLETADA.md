@@ -1,23 +1,27 @@
-# 🎉 ARQUITECTURA C - 100% COMPLETADA 🎉
+# ARQUITECTURA C — COMPLETADA + CONFIS INTEGRADO
 
-**Fecha de Completación**: 2025-01-17
+**Fase 1 completada**: Noviembre 2025
+**Fase 2 (CONFIS) completada**: Febrero 2026
+**Versión actual**: 2.1 (Arquitectura C + CONFIS)
 **Estado**: ✅ **PRODUCCIÓN READY**
+**Tests**: 134/134 passing (100%)
 
 ---
 
 ## RESUMEN EJECUTIVO
 
-¡**Sistema de priorización de proyectos sociales completado al 100%**!
+Sistema de priorización de proyectos sociales completado con integración de metodología CONFIS (Consejo Superior de Política Fiscal, Anexo 2).
 
-La **Arquitectura C** está completamente implementada, testeada y validada con **4 criterios** que suman **100%** del scoring:
+La **Arquitectura C v2.1** incluye 4 criterios + gate de elegibilidad + scoring CONFIS oficial:
 
 ```
-✅ SROI (40%) - Dominante
-✅ Stakeholders (25%)
-✅ Probabilidad Aprobación (20%)
-✅ Riesgos (15%)
-───────────────────────────
-   TOTAL: 100% ✅
+✅ SROI (40%) - Logarítmico continuo
+✅ Stakeholders (25%) - Rúbricas + territorial CONFIS
+✅ Probabilidad CONFIS (20%) - 8 grupos, fórmula Anexo 2
+✅ Riesgos (15%) - Alertas contextuales
+✅ Gate de Elegibilidad - PDET/ZOMAC/Amazonía
+───────────────────────────────────────────
+   TOTAL: 100% + Gate ✅
 ```
 
 ---
@@ -38,8 +42,8 @@ La **Arquitectura C** está completamente implementada, testeada y validada con 
 │  2. Stakeholders (25%)          ████████████           │
 │     Pertinencia y Relacionamiento                      │
 │                                                         │
-│  3. Probabilidad Aprob. (20%)   ██████████             │
-│     Elegibilidad PDET/ZOMAC                            │
+│  3. Prob. CONFIS (20%)          ██████████             │
+│     8 Grupos + Territorial + Sectorial + Gate          │
 │                                                         │
 │  4. Riesgos (15%)               ████████               │
 │     Evaluación Multidimensional (Inverso)              │
@@ -78,70 +82,84 @@ La **Arquitectura C** está completamente implementada, testeada y validada con 
 
 ### 1. SROI - 40% (Dominante)
 
-**Metodología**: Social Return on Investment
+**Metodología**: Función logarítmica continua (actualizado Feb 2026)
 
 ```
-Score basado en rangos SROI:
-- < 1.0:   RECHAZADO (destruye valor)
-- 1.0-1.99: BAJA (retorno marginal)
-- 2.0-2.99: MEDIA (retorno aceptable)
-- ≥ 3.0:    ALTA (retorno excelente)
-- > 7.0:    VERIFICAR (validar metodología)
+Fórmula: Score = min(100, max(0, 28.43 × log₁₀(SROI) + 60))
+
+Valores de referencia:
+- < 1.0:  Score 0 → RECHAZADO (destruye valor)
+- 1.0:    Score 60
+- 3.0:    Score 73.6
+- 10.0:   Score 88.4
+- > 7.0:  VERIFICAR (validar metodología)
 ```
 
 **Características**:
+- ✅ Función continua (elimina saltos discretos)
 - ✅ Penalización severa por SROI < 1.0
 - ✅ Alerta para SROI > 7.0 (verificación)
-- ✅ Observaciones metodológicas
-- ✅ Metadata de confianza
+- ✅ Observaciones obligatorias para SROI > 5.0
 
 ---
 
 ### 2. Stakeholders - 25%
 
-**Componentes**:
+**Componentes** (actualizado Feb 2026 con rúbricas y CONFIS):
 
 ```
-1. Pertinencia Operacional/Reputacional (40%)
-   Escala 1-5: Impacto en operaciones ISA
+1. Pertinencia Operacional (40%)
+   Escala 1-5 con rúbricas verificables
 
-2. Mejora del Relacionamiento (40%)
-   Escala 1-5: Fortalecimiento de confianza
+2. Mejora del Relacionamiento (35%)
+   Escala 1-5 con criterios documentados
 
-3. Stakeholders Involucrados (10%)
-   Bonus por stakeholders estratégicos
+3. Alcance Territorial (15%)
+   Puntaje territorial CONFIS ×3 (máx 30) +
+   Municipios ×10 (máx 30) + PDET(15) +
+   Multi-depto(15) + Corredor(10) = máx 100
 
-4. Corredor de Transmisión (10%)
-   Bonus por ubicación estratégica
+4. Stakeholders Involucrados (10%)
+   Tipos de actores involucrados
 ```
 
 **Características**:
+- ✅ Rúbricas objetivas que reducen variabilidad inter-evaluador
+- ✅ Puntaje territorial CONFIS integrado en alcance
 - ✅ Balance operacional/relacional
-- ✅ Reconocimiento de stakeholders clave
-- ✅ Bonus por ubicación estratégica
 - ✅ Validaciones y recomendaciones
 
 ---
 
-### 3. Probabilidad de Aprobación - 20%
+### 3. Probabilidad de Aprobación CONFIS - 20% (Reescrito Feb 2026)
 
-**Metodología**: Matriz PDET/ZOMAC oficial
+**Metodología**: Fórmula oficial CONFIS (Anexo 2)
 
 ```
-Score basado en:
-1. Elegibilidad PDET (tiene_municipios_pdet)
-2. Puntaje sectorial (1-10 por sector)
-3. Máximo puntaje entre sectores
+Gate de Elegibilidad:
+- Solo municipios PDET/ZOMAC/Amazonía elegibles
+- Otros → Score 0, nivel "NO ELEGIBLE"
+
+Fórmula:
+Score = GrupoPriorización × 20% + ScoreCONFIS × 80%
+ScoreCONFIS = ((PuntajeTerritorial + PuntajeSectorial) / 20) × 100
+
+8 Grupos de Priorización:
+Grupo 1: PATR-PDET + estructuración → 100
+Grupo 2: PATR-PDET sin estructuración → 90
+Grupo 3: PDET + estructuración → 80
+Grupo 4: PDET sin estructuración → 70
+Grupo 5: ZOMAC + estructuración → 60
+Grupo 6: ZOMAC sin estructuración → 50
+Grupo 7: Amazonía + estructuración → 40
+Grupo 8: Amazonía sin estructuración → 30
 ```
 
 **Fuente de Datos**:
-- ✅ Base de datos SQLite con 1,102 municipios
+- ✅ Base de datos SQLite con 362 municipios PDET/ZOMAC
 - ✅ 10 sectores priorizados
+- ✅ Indicadores territoriales (IPM, MDM, IICA, CULTIVOS)
 - ✅ Datos oficiales PDET/ZOMAC
-
-**Resultados**:
-- Municipio PDET + Sector prioridad 10 = **100% probabilidad**
-- Municipio NO-PDET = **0% probabilidad**
 
 ---
 
@@ -162,36 +180,29 @@ Nivel de Riesgo = Probabilidad (1-5) × Impacto (1-5)
 Score = 100 - (nivel / 25 × 100)
 ```
 
-**Factores Automáticos**:
-- Presupuesto > $1B: -15 pts
-- Duración > 24 meses: -10 pts
-- Múltiples departamentos: -5 pts
-- Población vulnerable: -5 pts
-
-**Niveles**:
-- 1-5: BAJO
-- 6-12: MEDIO
-- 13-20: ALTO
-- 21-25: CRÍTICO
+**Alertas Contextuales** (informativas, no afectan score — actualizado Feb 2026):
+- Presupuesto > $500M: Supervisión financiera reforzada
+- Duración > 36 meses: Hitos de seguimiento intermedios
+- Multi-departamental: Coordinación territorial
+- Comunidades indígenas: Verificar consulta previa
 
 ---
 
 ## MÉTRICAS DEL SISTEMA
 
-### Cobertura de Tests
+### Cobertura de Tests (actualizado Feb 2026)
 
 ```
 CRITERIOS:
 ✅ SROI:                  28 tests
-✅ Stakeholders:          30 tests
-✅ Probabilidad:          15 tests (matriz PDET)
-✅ Riesgos:               48 tests
+✅ Stakeholders:          Tests integrados (con CONFIS territorial)
+✅ Prob. CONFIS:          17 tests (8 grupos + gate)
+✅ Riesgos:               Tests integrados (con alertas)
 
 INTEGRACIÓN:
-✅ Motor Arquitectura C:   7 tests
-✅ Modelo ProyectoSocial:  1 test
+✅ Motor Arquitectura C:  13 tests (gate + CONFIS + alertas)
 
-TOTAL: 129 tests (100% passing) ✅
+TOTAL: 134 tests (100% passing) ✅
 ```
 
 ### Validación E2E
@@ -382,6 +393,16 @@ El sistema clasifica proyectos en 5 niveles:
 
 ---
 
+### 6. NO ELEGIBLE (Municipio fuera de PDET/ZOMAC/Amazonía) — Nuevo Feb 2026
+
+**Características**:
+- Municipio no pertenece a PDET, ZOMAC ni Amazonía
+- No aplica para mecanismo de Obras por Impuestos
+
+**Recomendación**: Buscar otro mecanismo de financiación
+
+---
+
 ## TECNOLOGÍAS Y HERRAMIENTAS
 
 ### Stack Técnico
@@ -440,12 +461,24 @@ data/
 - ✅ 30 tests comprehensivos
 - ✅ Sistema llega a 81 tests
 
-### Sesión 7: Riesgos (15%) - **FINALIZACIÓN**
+### Sesión 7: Riesgos (15%) - **FINALIZACIÓN FASE 1**
 - ✅ Criterio Riesgos implementado
 - ✅ 48 tests adicionales
 - ✅ E2E validation completa
 - ✅ **129 tests totales**
-- ✅ **ARQUITECTURA C 100% COMPLETA** 🎉
+- ✅ **ARQUITECTURA C 100% COMPLETA**
+
+### Sesión 8: Integración CONFIS (Feb 2026) - **FASE 2**
+- ✅ Gate de elegibilidad PDET/ZOMAC/Amazonía
+- ✅ Criterio 3 reescrito con fórmula CONFIS (8 grupos)
+- ✅ Alcance territorial con puntaje CONFIS
+- ✅ SROI confirmado como logarítmico continuo
+- ✅ Riesgos convertidos a alertas contextuales
+- ✅ Excel actualizado con fórmulas CONFIS + hoja Metodología
+- ✅ Dashboard HTML con scoring CONFIS
+- ✅ Guía Operativa v2.1 con CONFIS completo
+- ✅ README.md reescrito
+- ✅ **134 tests totales**
 
 ---
 
@@ -503,45 +536,34 @@ Sistema completamente documentado y testeado, con lógica clara y auditable.
 
 ---
 
+## ENTREGABLES (actualizado Feb 2026)
+
+| Entregable | Archivo | Estado |
+|------------|---------|--------|
+| Motor Python | `src/` (4 criterios + motor + gate) | ✅ 134 tests |
+| Excel operativo | `Priorizacion_Proyectos_ENLAZA_GEB.xlsx` | ✅ Fórmulas CONFIS |
+| Dashboard HTML | `Dashboard_Priorizacion_ENLAZA_GEB.html` | ✅ CONFIS integrado |
+| Guía Operativa | `Guia_Operativa_Evaluadores_ENLAZA_GEB.docx` | ✅ v2.1 CONFIS |
+| README | `README.md` | ✅ Actualizado |
+
+---
+
 ## CONCLUSIÓN
 
-**La Arquitectura C está 100% completa y lista para producción.**
-
-El sistema proporciona una evaluación **integral, balanceada y basada en datos** para la priorización de proyectos sociales, con:
+**La Arquitectura C v2.1 está completa con integración CONFIS y lista para producción.**
 
 ✅ **4 criterios** completamente implementados (100%)
-✅ **129 tests** (100% passing)
-✅ **Validación E2E** completa
-✅ **Documentación exhaustiva**
-✅ **Datos oficiales PDET/ZOMAC**
+✅ **Gate de elegibilidad** PDET/ZOMAC/Amazonía
+✅ **Metodología CONFIS** oficial (Anexo 2) integrada
+✅ **134 tests** (100% passing)
+✅ **Rúbricas objetivas** para evaluadores
+✅ **5 entregables** actualizados y consistentes
 ✅ **Código production-ready**
 
 ---
 
-## 🎊 CELEBRACIÓN 🎊
-
-```
-╔════════════════════════════════════════════════════╗
-║                                                    ║
-║         🎉  ARQUITECTURA C COMPLETADA  🎉         ║
-║                                                    ║
-║              100% IMPLEMENTADA                     ║
-║              129 TESTS PASSING                     ║
-║              PRODUCTION READY                      ║
-║                                                    ║
-║     ✅ SROI (40%)                                  ║
-║     ✅ Stakeholders (25%)                          ║
-║     ✅ Probabilidad (20%)                          ║
-║     ✅ Riesgos (15%)                               ║
-║                                                    ║
-║           MISIÓN CUMPLIDA 🚀                       ║
-║                                                    ║
-╚════════════════════════════════════════════════════╝
-```
-
----
-
-**Fecha**: 2025-01-17
-**Versión**: 1.0 - FINAL
-**Sistema**: Arquitectura C - Sistema de Priorización de Proyectos Sociales
+**Fase 1**: Noviembre 2025 (Arquitectura C base)
+**Fase 2**: Febrero 2026 (Integración CONFIS)
+**Versión**: 2.1
+**Tests**: 134/134 passing
 **Estado**: ✅ **COMPLETO Y OPERACIONAL**

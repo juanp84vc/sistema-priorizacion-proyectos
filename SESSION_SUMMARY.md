@@ -1,8 +1,9 @@
 # RESUMEN DE SESIONES - IMPLEMENTACIÓN ARQUITECTURA C
 
 **Proyecto:** Sistema de Priorización de Proyectos Sociales
-**Arquitectura:** Arquitectura C (Aprobada 15 Nov 2025)
-**Progreso:** 3/4 criterios (75%)
+**Arquitectura:** Arquitectura C v2.1 (Base Nov 2025 + CONFIS Feb 2026)
+**Progreso:** 4/4 criterios (100%) + Gate de Elegibilidad + CONFIS integrado
+**Tests:** 134/134 passing
 
 ---
 
@@ -12,10 +13,10 @@
 
 ```
 Score Final del Proyecto =
-    SROI × 40% +                      ← ✅ COMPLETADO (16 Nov)
-    Stakeholders × 25% +              ← ✅ COMPLETADO (17 Nov)
-    Probabilidad Aprobación × 20% +   ← ✅ COMPLETADO (15 Nov)
-    Riesgos × 15%                     ← ⏳ PENDIENTE
+    SROI × 40% +                      ← ✅ Logarítmico continuo (Nov 2025, ajustado Feb 2026)
+    Stakeholders × 25% +              ← ✅ Rúbricas + territorial CONFIS (Nov 2025, ajustado Feb 2026)
+    Prob. CONFIS × 20% +              ← ✅ 8 grupos Anexo 2 + Gate (Feb 2026)
+    Riesgos × 15%                     ← ✅ Alertas contextuales (Nov 2025, ajustado Feb 2026)
 ```
 
 ### Cambios vs Sistema Actual
@@ -1405,5 +1406,51 @@ Score = SROI×40% + Stakeholders×25% + Prob.Aprob×20% + Riesgos×15%
 3. Dashboard de visualización
 4. Calibración con data real
 5. Extensiones (ML, análisis de portafolio)
+
+---
+
+## SESIÓN 8: INTEGRACIÓN CONFIS — FASE 2 (FEBRERO 2026)
+
+**Fecha:** Febrero 2026
+**Estado:** ✅ **COMPLETADO**
+
+### Objetivo
+
+Integrar la metodología oficial del CONFIS (Consejo Superior de Política Fiscal, Anexo 2) al sistema de priorización, reemplazando el scoring simplificado de Probabilidad de Aprobación con la fórmula oficial que incluye 8 grupos de priorización, puntajes territoriales y sectoriales, y un gate de elegibilidad.
+
+### Cambios Implementados
+
+#### Cambio A: Gate de Elegibilidad
+- Propiedad `es_elegible_oxi` en ProyectoSocial
+- Motor asigna score=0, nivel="NO ELEGIBLE" para municipios fuera de PDET/ZOMAC/Amazonía
+- Archivos: `src/models/proyecto.py`, `src/scoring/motor_arquitectura_c.py`
+
+#### Cambio B: Criterio 3 reescrito con fórmula CONFIS
+- Score = GrupoPriorización × 20% + ScoreCONFIS × 80%
+- 8 grupos de priorización (PATR-PDET, PDET, ZOMAC, Amazonía × estructuración)
+- Puntaje territorial (IPM + MDM + IICA + CULTIVOS) y sectorial (1-10)
+- Archivos: `src/criterios/probabilidad_aprobacion_pdet.py`, `tests/test_matriz_pdet.py`
+
+#### Cambio C: Alcance Territorial con CONFIS
+- Puntaje territorial CONFIS × 3 (máx 30) reemplaza bonus binario PDET (+20)
+- Nueva distribución: territorial(30) + municipios(30) + PDET(15) + multi-depto(15) + corredor(10) = 100
+- Archivos: `src/criterios/stakeholders.py`, `tests/test_stakeholders.py`
+
+### Entregables Actualizados
+- ✅ Excel: Fórmulas CONFIS + nueva hoja "Metodología CONFIS"
+- ✅ Dashboard HTML: Scoring CONFIS integrado
+- ✅ Guía Operativa: v2.1 con CONFIS completo, 8 grupos, gate
+- ✅ README.md: Reescritura completa
+- ✅ Documentación de sesión: `SESION_FEB_2026_CONFIS.md`
+
+### Resultado
+
+```
+Tests: 134/134 passing (100%)
+Versión: 2.1 (Arquitectura C + CONFIS)
+Estado: PRODUCTION READY
+```
+
+**Ver detalle completo en:** `SESION_FEB_2026_CONFIS.md`
 
 ---

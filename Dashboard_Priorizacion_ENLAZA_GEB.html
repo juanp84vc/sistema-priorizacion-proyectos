@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Priorización - ENLAZA GEB</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+    <style>
+        :root {
+            --bg-primary: #f0f2f5;
+            --bg-card: #ffffff;
+            --bg-header: #1a3a5c;
+            --blue: #1a5276;
+            --blue-light: #d6eaf8;
+            --green: #1e8449;
+            --green-light: #d5f5e3;
+            --red: #922b21;
+            --red-light: #fadbd8;
+            --orange: #b9770e;
+            --orange-light: #fad7a0;
+            --text: #212529;
+            --text-sec: #6c757d;
+            --gap: 16px;
+            --radius: 10px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text); line-height: 1.5; }
+        .container { max-width: 1400px; margin: 0 auto; padding: var(--gap); }
+
+        /* Tabs */
+        .tab-bar { display: flex; gap: 4px; margin-bottom: var(--gap); }
+        .tab-btn { padding: 12px 24px; border: none; background: var(--bg-card); color: var(--text-sec); font-size: 14px; font-weight: 600; cursor: pointer; border-radius: var(--radius) var(--radius) 0 0; transition: all 0.2s; }
+        .tab-btn.active { background: var(--bg-header); color: #fff; }
+        .tab-btn:hover:not(.active) { background: #e2e6ea; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Header */
+        .header { background: var(--bg-header); color: #fff; padding: 20px 24px; border-radius: var(--radius); margin-bottom: var(--gap); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header-sub { font-size: 13px; opacity: 0.7; }
+
+        /* KPI */
+        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--gap); margin-bottom: var(--gap); }
+        .kpi-card { background: var(--bg-card); border-radius: var(--radius); padding: 18px 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--blue); }
+        .kpi-card.green { border-left-color: var(--green); }
+        .kpi-card.orange { border-left-color: var(--orange); }
+        .kpi-card.red { border-left-color: var(--red); }
+        .kpi-label { font-size: 12px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .kpi-value { font-size: 28px; font-weight: 700; }
+
+        /* Charts */
+        .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: var(--gap); margin-bottom: var(--gap); }
+        .chart-container { background: var(--bg-card); border-radius: var(--radius); padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .chart-container h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+        .chart-container canvas { max-height: 320px; }
+
+        /* Table */
+        .table-section { background: var(--bg-card); border-radius: var(--radius); padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto; margin-bottom: var(--gap); }
+        .table-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th { text-align: left; padding: 10px 12px; border-bottom: 2px solid #dee2e6; color: var(--text-sec); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; white-space: nowrap; }
+        thead th:hover { color: var(--text); background: #f8f9fa; }
+        tbody td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+        tbody tr:hover { background: #f8f9fa; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-green { background: var(--green-light); color: var(--green); }
+        .badge-blue { background: var(--blue-light); color: var(--blue); }
+        .badge-orange { background: var(--orange-light); color: var(--orange); }
+        .badge-red { background: var(--red-light); color: var(--red); }
+
+        /* Simulator */
+        .sim-controls { background: var(--bg-card); border-radius: var(--radius); padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: var(--gap); }
+        .sim-controls h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+        .slider-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .slider-item { display: flex; flex-direction: column; gap: 6px; }
+        .slider-item label { font-size: 13px; font-weight: 600; color: var(--text); display: flex; justify-content: space-between; }
+        .slider-item label span { color: var(--blue); font-size: 15px; }
+        input[type="range"] { width: 100%; height: 6px; -webkit-appearance: none; background: #dee2e6; border-radius: 3px; outline: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; }
+        .weight-total { font-size: 14px; font-weight: 600; padding: 10px 0; text-align: center; }
+        .weight-total.error { color: var(--red); }
+        .weight-total.ok { color: var(--green); }
+
+        /* Alerts box */
+        .alerts-box { background: #fff9e6; border: 1px solid #ffd54f; border-radius: var(--radius); padding: 16px 20px; margin-bottom: var(--gap); }
+        .alerts-box h4 { font-size: 13px; color: var(--orange); margin-bottom: 8px; }
+        .alert-item { font-size: 12px; color: #5d4037; padding: 3px 0; }
+
+        .footer { text-align: center; padding: 12px; font-size: 12px; color: var(--text-sec); }
+        @media (max-width: 768px) {
+            .chart-row { grid-template-columns: 1fr; }
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+            .tab-btn { padding: 10px 14px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>Sistema de Priorizacion - ENLAZA GEB</h1>
+            <div class="header-sub">Arquitectura C | CONFIS Integrado | Metodologia ajustada Feb 2026</div>
+        </div>
+        <div class="header-sub">Proyectos de ejemplo para demostracion</div>
+    </div>
+
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+        <button class="tab-btn" onclick="switchTab('simulator')">Simulador de Escenarios</button>
+        <button class="tab-btn" onclick="switchTab('sroi')">Curva SROI</button>
+    </div>
+
+    <!-- ===== TAB 1: DASHBOARD ===== -->
+    <div id="tab-dashboard" class="tab-content active">
+        <div class="kpi-row">
+            <div class="kpi-card green"><div class="kpi-label">Proyectos Evaluados</div><div class="kpi-value" id="kpi-total">0</div></div>
+            <div class="kpi-card"><div class="kpi-label">Score Promedio</div><div class="kpi-value" id="kpi-avg">0</div></div>
+            <div class="kpi-card green"><div class="kpi-label">Prioridad Muy Alta</div><div class="kpi-value" id="kpi-high">0</div></div>
+            <div class="kpi-card orange"><div class="kpi-label">Prioridad Media/Baja</div><div class="kpi-value" id="kpi-low">0</div></div>
+        </div>
+        <div class="chart-row">
+            <div class="chart-container"><h3>Ranking de Proyectos (Score Total)</h3><canvas id="chart-ranking"></canvas></div>
+            <div class="chart-container"><h3>Composicion del Score por Criterio</h3><canvas id="chart-composition"></canvas></div>
+        </div>
+        <div class="chart-row">
+            <div class="chart-container"><h3>Distribucion por Nivel de Prioridad</h3><canvas id="chart-dist"></canvas></div>
+            <div class="chart-container"><h3>Perfil de Riesgo por Proyecto</h3><canvas id="chart-risk"></canvas></div>
+        </div>
+        <div id="alerts-container"></div>
+        <div class="table-section">
+            <h3>Detalle de Proyectos</h3>
+            <div id="table-container"></div>
+        </div>
+    </div>
+
+    <!-- ===== TAB 2: SIMULATOR ===== -->
+    <div id="tab-simulator" class="tab-content">
+        <div class="sim-controls">
+            <h3>Ajustar Pesos de Arquitectura C</h3>
+            <p style="font-size:13px;color:var(--text-sec);margin-bottom:16px;">Mueva los deslizadores para explorar como cambia el ranking con diferentes configuraciones de pesos. Los pesos deben sumar 100%.</p>
+            <div class="slider-group">
+                <div class="slider-item">
+                    <label>SROI <span id="lbl-w1">40%</span></label>
+                    <input type="range" id="w-sroi" min="5" max="60" value="40" oninput="updateSim()">
+                </div>
+                <div class="slider-item">
+                    <label>Stakeholders <span id="lbl-w2">25%</span></label>
+                    <input type="range" id="w-stak" min="5" max="50" value="25" oninput="updateSim()">
+                </div>
+                <div class="slider-item">
+                    <label>Prob. Aprobacion <span id="lbl-w3">20%</span></label>
+                    <input type="range" id="w-prob" min="5" max="40" value="20" oninput="updateSim()">
+                </div>
+                <div class="slider-item">
+                    <label>Riesgos <span id="lbl-w4">15%</span></label>
+                    <input type="range" id="w-risk" min="5" max="40" value="15" oninput="updateSim()">
+                </div>
+            </div>
+            <div id="weight-total" class="weight-total ok">Total: 100%</div>
+        </div>
+        <div class="chart-row">
+            <div class="chart-container"><h3>Ranking con Pesos Ajustados</h3><canvas id="chart-sim-ranking"></canvas></div>
+            <div class="chart-container"><h3>Comparacion: Original vs Ajustado</h3><canvas id="chart-sim-compare"></canvas></div>
+        </div>
+        <div class="table-section">
+            <h3>Detalle con Pesos Ajustados</h3>
+            <div id="sim-table-container"></div>
+        </div>
+    </div>
+
+    <!-- ===== TAB 3: SROI CURVE ===== -->
+    <div id="tab-sroi" class="tab-content">
+        <div class="chart-row" style="grid-template-columns:1fr;">
+            <div class="chart-container" style="max-width:900px;margin:0 auto;">
+                <h3>Funcion Logaritmica SROI: Score = 60 + 35 x ln(SROI) / ln(3)</h3>
+                <canvas id="chart-sroi-curve" style="max-height:400px;"></canvas>
+                <p style="font-size:12px;color:var(--text-sec);margin-top:12px;">La curva azul muestra la funcion continua (nueva). Los cuadrados rojos muestran los rangos discretos (anterior). Los puntos verdes son los proyectos de ejemplo.</p>
+            </div>
+        </div>
+        <div class="chart-row" style="grid-template-columns:1fr;">
+            <div class="chart-container" style="max-width:900px;margin:0 auto;">
+                <h3>Impacto del SROI en Score Total (contribucion del 40%)</h3>
+                <canvas id="chart-sroi-impact" style="max-height:300px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">ENLAZA GEB - Sistema de Priorizacion de Proyectos Sociales | Arquitectura C v2.1 | CONFIS Integrado | Febrero 2026</div>
+</div>
+
+<script>
+// ===== SAMPLE PROJECT DATA =====
+const PROJECTS = [
+    { id: 1, name: "Fortalecimiento Productivo Corredor Norte", dept: "Bolivar", sroi: 2.8, pert: 4, rel: 4, corredor: true, pdet: true, muni: 3, grupoCONFIS: 3, puntajeTerritorial: 7.5, puntajeSectorial: 8, rTec: [2,2], rSoc: [1,2], rFin: [2,1], rReg: [1,1] },
+    { id: 2, name: "Educacion Digital Comunidades PDET", dept: "Cauca", sroi: 3.2, pert: 5, rel: 5, corredor: true, pdet: true, muni: 5, grupoCONFIS: 4, puntajeTerritorial: 8.5, puntajeSectorial: 9, rTec: [2,3], rSoc: [1,1], rFin: [1,2], rReg: [1,1] },
+    { id: 3, name: "Acueducto Veredal San Antonio", dept: "Santander", sroi: 1.8, pert: 3, rel: 3, corredor: false, pdet: false, muni: 1, grupoCONFIS: 7, puntajeTerritorial: 5.5, puntajeSectorial: 6, rTec: [3,3], rSoc: [2,2], rFin: [3,2], rReg: [2,2] },
+    { id: 4, name: "Reforestacion Cuenca Rio Magdalena", dept: "Antioquia", sroi: 2.1, pert: 3, rel: 2, corredor: true, pdet: false, muni: 4, grupoCONFIS: 6, puntajeTerritorial: 6.5, puntajeSectorial: 7.5, rTec: [2,2], rSoc: [2,3], rFin: [2,2], rReg: [3,3] },
+    { id: 5, name: "Centro Comunitario La Esperanza", dept: "Cesar", sroi: 1.3, pert: 2, rel: 3, corredor: false, pdet: true, muni: 1, grupoCONFIS: 4, puntajeTerritorial: 7, puntajeSectorial: 7, rTec: [3,4], rSoc: [3,3], rFin: [3,3], rReg: [2,2] },
+    { id: 6, name: "Conectividad Rural 5 Municipios", dept: "Nariño", sroi: 4.1, pert: 5, rel: 4, corredor: true, pdet: true, muni: 5, grupoCONFIS: 3, puntajeTerritorial: 8, puntajeSectorial: 8.5, rTec: [3,2], rSoc: [2,2], rFin: [2,3], rReg: [2,1] },
+    { id: 7, name: "Emprendimiento Mujeres Rurales", dept: "Boyaca", sroi: 2.5, pert: 3, rel: 4, corredor: false, pdet: false, muni: 2, grupoCONFIS: 8, puntajeTerritorial: 5, puntajeSectorial: 6.5, rTec: [1,2], rSoc: [1,1], rFin: [2,2], rReg: [1,1] },
+    { id: 8, name: "Infraestructura Deportiva Municipal", dept: "Meta", sroi: 0.9, pert: 1, rel: 2, corredor: false, pdet: false, muni: 1, grupoCONFIS: 8, puntajeTerritorial: 4.5, puntajeSectorial: 5, rTec: [2,3], rSoc: [2,2], rFin: [4,3], rReg: [2,2] },
+    { id: 9, name: "Salud Preventiva Zona Fronteriza", dept: "Norte de Santander", sroi: 3.5, pert: 4, rel: 5, corredor: false, pdet: true, muni: 3, grupoCONFIS: 5, puntajeTerritorial: 7.5, puntajeSectorial: 8.5, rTec: [2,2], rSoc: [1,2], rFin: [2,2], rReg: [3,2] },
+    { id: 10, name: "Turismo Comunitario Pacifico", dept: "Choco", sroi: 1.6, pert: 2, rel: 3, corredor: false, pdet: true, muni: 2, grupoCONFIS: 5, puntajeTerritorial: 6.5, puntajeSectorial: 7, rTec: [4,3], rSoc: [3,4], rFin: [3,3], rReg: [3,3] },
+];
+
+// ===== SCORING FUNCTIONS =====
+function calcSROI(sroi) {
+    if (sroi < 1.0) return 0;
+    return Math.min(Math.max(60 + 35 * Math.log(sroi) / Math.log(3), 0), 98);
+}
+
+const PERT_MAP = {5:100, 4:85, 3:65, 2:40, 1:20};
+const REL_MAP = {5:100, 4:85, 3:65, 2:40, 1:20};
+
+function calcStakeholders(p) {
+    const sp = PERT_MAP[p.pert] || 50;
+    const sr = REL_MAP[p.rel] || 50;
+    let alcance = 0;
+    let terrScore = p.puntajeTerritorial || 5.0;
+    alcance += Math.min(Math.max(terrScore, 1), 10) * 3;
+    alcance += Math.min(p.muni * 10, 30);
+    if (p.pdet) alcance += 15;
+    if (p.corredor) alcance += 10;
+    const sa = Math.min(alcance, 100);
+    return sp * 0.40 + sr * 0.35 + sa * 0.15 + 50 * 0.10;
+}
+
+function calcRiskComp(prob, imp) {
+    const nivel = prob * imp;
+    return Math.max(Math.min(100 - (nivel / 25 * 100), 100), 0);
+}
+
+function calcRisk(p) {
+    return calcRiskComp(p.rTec[0], p.rTec[1]) * 0.30
+         + calcRiskComp(p.rSoc[0], p.rSoc[1]) * 0.25
+         + calcRiskComp(p.rFin[0], p.rFin[1]) * 0.20
+         + calcRiskComp(p.rReg[0], p.rReg[1]) * 0.15
+         + 10;
+}
+
+function scoreProject(p, w = {sroi:0.40, stak:0.25, prob:0.20, risk:0.15}) {
+    const sSROI = calcSROI(p.sroi);
+    const sStk = calcStakeholders(p);
+    const grupoCONFIS = p.grupoCONFIS || (p.pdet ? 4 : 6);
+    const GRUPO_SCORES = {1:100,2:90,3:80,4:70,5:55,6:45,7:35,8:25};
+    const scoreGrupo = GRUPO_SCORES[grupoCONFIS] || 50;
+    const terrScore = p.puntajeTerritorial || 5.0;
+    const sectScore = p.puntajeSectorial || 5.0;
+    const scoreCONFIS = ((terrScore + sectScore) / 20) * 100;
+    const sProb = scoreGrupo * 0.20 + scoreCONFIS * 0.80;
+    const sRisk = calcRisk(p);
+    const total = sSROI * w.sroi + sStk * w.stak + sProb * w.prob + sRisk * w.risk;
+    return { total: Math.round(total * 10) / 10, sroi: Math.round(sSROI * 10) / 10, stak: Math.round(sStk * 10) / 10, prob: Math.round(sProb * 10) / 10, risk: Math.round(sRisk * 10) / 10,
+             cSroi: Math.round(sSROI * w.sroi * 10) / 10, cStak: Math.round(sStk * w.stak * 10) / 10, cProb: Math.round(sProb * w.prob * 10) / 10, cRisk: Math.round(sRisk * w.risk * 10) / 10 };
+}
+
+function getLevel(score, sroi) {
+    if (sroi !== undefined && sroi < 1.0) return { label: 'RECHAZADO', cls: 'badge-red' };
+    if (score >= 85) return { label: 'MUY ALTA', cls: 'badge-green' };
+    if (score >= 70) return { label: 'ALTA', cls: 'badge-blue' };
+    if (score >= 50) return { label: 'MEDIA', cls: 'badge-orange' };
+    return { label: 'BAJA', cls: 'badge-red' };
+}
+
+// ===== COMPUTE ALL =====
+let scored = PROJECTS.map(p => ({ ...p, ...scoreProject(p) })).sort((a, b) => b.total - a.total);
+
+// ===== COLORS =====
+const C = { sroi: '#2196F3', stak: '#4CAF50', prob: '#FF9800', risk: '#F44336' };
+
+// ===== DASHBOARD =====
+function renderDashboard() {
+    document.getElementById('kpi-total').textContent = scored.length;
+    const avg = scored.reduce((s, p) => s + p.total, 0) / scored.length;
+    document.getElementById('kpi-avg').textContent = avg.toFixed(1);
+    document.getElementById('kpi-high').textContent = scored.filter(p => p.total >= 85).length;
+    document.getElementById('kpi-low').textContent = scored.filter(p => p.total < 70).length;
+
+    // Ranking bar chart
+    const names = scored.map(p => p.name.length > 30 ? p.name.substring(0, 28) + '...' : p.name);
+    const colors = scored.map(p => { const l = getLevel(p.total, p.sroi); return l.cls === 'badge-green' ? '#1e8449' : l.cls === 'badge-blue' ? '#1a5276' : l.cls === 'badge-orange' ? '#b9770e' : '#922b21'; });
+
+    new Chart(document.getElementById('chart-ranking'), {
+        type: 'bar', data: { labels: names, datasets: [{ data: scored.map(p => p.total), backgroundColor: colors.map(c => c + 'CC'), borderColor: colors, borderWidth: 1, borderRadius: 4 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `Score: ${ctx.parsed.x} pts` } } },
+            scales: { x: { beginAtZero: true, max: 100, grid: { color: '#f0f0f0' } }, y: { grid: { display: false } } } }
+    });
+
+    // Stacked composition
+    new Chart(document.getElementById('chart-composition'), {
+        type: 'bar', data: { labels: names,
+            datasets: [
+                { label: 'SROI (40%)', data: scored.map(p => p.cSroi), backgroundColor: C.sroi + 'CC' },
+                { label: 'Stakeholders (25%)', data: scored.map(p => p.cStak), backgroundColor: C.stak + 'CC' },
+                { label: 'Prob. CONFIS (20%)', data: scored.map(p => p.cProb), backgroundColor: C.prob + 'CC' },
+                { label: 'Riesgos (15%)', data: scored.map(p => p.cRisk), backgroundColor: C.risk + 'CC' },
+            ] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 12, font: { size: 11 } } } },
+            scales: { x: { stacked: true, max: 100, grid: { color: '#f0f0f0' } }, y: { stacked: true, grid: { display: false } } } }
+    });
+
+    // Distribution doughnut
+    const dist = { 'RECHAZADO': 0, 'MUY ALTA': 0, 'ALTA': 0, 'MEDIA': 0, 'BAJA': 0 };
+    scored.forEach(p => dist[getLevel(p.total, p.sroi).label]++);
+    new Chart(document.getElementById('chart-dist'), {
+        type: 'doughnut', data: { labels: Object.keys(dist), datasets: [{ data: Object.values(dist), backgroundColor: ['#922b21CC', '#1e8449CC', '#1a5276CC', '#b9770eCC', '#922b21CC'], borderColor: '#fff', borderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'right', labels: { usePointStyle: true, padding: 15 } } } }
+    });
+
+    // Risk radar-style (bar)
+    new Chart(document.getElementById('chart-risk'), {
+        type: 'bar', data: { labels: scored.map(p => p.name.substring(0, 20)),
+            datasets: [
+                { label: 'Tecnico', data: scored.map(p => calcRiskComp(p.rTec[0], p.rTec[1])), backgroundColor: '#2196F366' },
+                { label: 'Social', data: scored.map(p => calcRiskComp(p.rSoc[0], p.rSoc[1])), backgroundColor: '#4CAF5066' },
+                { label: 'Financiero', data: scored.map(p => calcRiskComp(p.rFin[0], p.rFin[1])), backgroundColor: '#FF980066' },
+                { label: 'Regulatorio', data: scored.map(p => calcRiskComp(p.rReg[0], p.rReg[1])), backgroundColor: '#F4433666' },
+            ] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+            scales: { x: { grid: { display: false } }, y: { beginAtZero: true, max: 100, grid: { color: '#f0f0f0' } } } }
+    });
+
+    // Alerts
+    const alertsHtml = [];
+    scored.forEach(p => {
+        if (p.sroi < 1) alertsHtml.push(`<div class="alert-item">⛔ <b>${p.name}</b>: SROI < 1.0 - Proyecto RECHAZADO</div>`);
+        if (p.sroi > 5) alertsHtml.push(`<div class="alert-item">⚠️ <b>${p.name}</b>: SROI > 5.0 - Verificar metodologia</div>`);
+        if (!p.pdet) alertsHtml.push(`<div class="alert-item">⚠️ <b>${p.name}</b>: No es PDET - Evaluado con CONFIS grupos 6-8</div>`);
+        if (p.rTec[0]*p.rTec[1] >= 12 || p.rSoc[0]*p.rSoc[1] >= 12) alertsHtml.push(`<div class="alert-item">🔴 <b>${p.name}</b>: Riesgo alto detectado</div>`);
+    });
+    if (alertsHtml.length > 0) {
+        document.getElementById('alerts-container').innerHTML = `<div class="alerts-box"><h4>⚡ Alertas del Sistema</h4>${alertsHtml.join('')}</div>`;
+    }
+
+    // Table
+    renderProjectTable('table-container', scored);
+}
+
+function renderProjectTable(containerId, data) {
+    let sortCol = 'total', sortDir = 'desc';
+    function render(d) {
+        let h = '<table><thead><tr>';
+        const cols = [
+            { f: 'name', l: 'Proyecto' }, { f: 'dept', l: 'Depto' }, { f: 'sroi', l: 'SROI' },
+            { f: 'cSroi', l: 'SROI pts' }, { f: 'cStak', l: 'Stak pts' }, { f: 'cProb', l: 'Prob pts' },
+            { f: 'cRisk', l: 'Risk pts' }, { f: 'total', l: 'Total' }, { f: '_level', l: 'Nivel' }
+        ];
+        cols.forEach(c => {
+            const arr = sortCol === c.f ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+            h += `<th data-col="${c.f}">${c.l}${arr}</th>`;
+        });
+        h += '</tr></thead><tbody>';
+        d.forEach(p => {
+            const lv = getLevel(p.total, p.sroi);
+            h += `<tr><td style="font-weight:600">${p.name}</td><td>${p.dept}</td><td style="text-align:center">${p.sroi}</td>`;
+            h += `<td style="text-align:center">${p.cSroi}</td><td style="text-align:center">${p.cStak}</td><td style="text-align:center">${p.cProb}</td><td style="text-align:center">${p.cRisk}</td>`;
+            h += `<td style="text-align:center;font-weight:700">${p.total}</td><td><span class="badge ${lv.cls}">${lv.label}</span></td></tr>`;
+        });
+        h += '</tbody></table>';
+        document.getElementById(containerId).innerHTML = h;
+        document.querySelectorAll(`#${containerId} th`).forEach(th => {
+            th.addEventListener('click', () => {
+                const col = th.dataset.col; if (!col || col === '_level') return;
+                if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc'; else { sortCol = col; sortDir = 'desc'; }
+                const sd = [...d].sort((a, b) => { const av = a[col], bv = b[col]; const c = av < bv ? -1 : av > bv ? 1 : 0; return sortDir === 'asc' ? c : -c; });
+                render(sd);
+            });
+        });
+    }
+    render(data);
+}
+
+// ===== SIMULATOR =====
+let simChartRanking, simChartCompare;
+
+function updateSim() {
+    const ws = parseFloat(document.getElementById('w-sroi').value);
+    const wk = parseFloat(document.getElementById('w-stak').value);
+    const wp = parseFloat(document.getElementById('w-prob').value);
+    const wr = parseFloat(document.getElementById('w-risk').value);
+    const total = ws + wk + wp + wr;
+
+    document.getElementById('lbl-w1').textContent = ws + '%';
+    document.getElementById('lbl-w2').textContent = wk + '%';
+    document.getElementById('lbl-w3').textContent = wp + '%';
+    document.getElementById('lbl-w4').textContent = wr + '%';
+
+    const totalEl = document.getElementById('weight-total');
+    totalEl.textContent = `Total: ${total}%` + (total !== 100 ? ' (debe sumar 100%)' : ' ✓');
+    totalEl.className = 'weight-total ' + (total === 100 ? 'ok' : 'error');
+
+    const w = { sroi: ws/100, stak: wk/100, prob: wp/100, risk: wr/100 };
+    const simScored = PROJECTS.map(p => {
+        const orig = scoreProject(p);
+        const adj = scoreProject(p, w);
+        return { ...p, origTotal: orig.total, ...adj };
+    }).sort((a, b) => b.total - a.total);
+
+    const names = simScored.map(p => p.name.length > 30 ? p.name.substring(0, 28) + '...' : p.name);
+    const simColors = simScored.map(p => { const l = getLevel(p.total, p.sroi); return l.cls === 'badge-green' ? '#1e8449CC' : l.cls === 'badge-blue' ? '#1a5276CC' : l.cls === 'badge-orange' ? '#b9770eCC' : '#922b21CC'; });
+
+    if (simChartRanking) {
+        simChartRanking.data.labels = names;
+        simChartRanking.data.datasets[0].data = simScored.map(p => p.total);
+        simChartRanking.data.datasets[0].backgroundColor = simColors;
+        simChartRanking.update('none');
+    } else {
+        simChartRanking = new Chart(document.getElementById('chart-sim-ranking'), {
+            type: 'bar', data: { labels: names, datasets: [{ data: simScored.map(p => p.total), backgroundColor: simColors, borderRadius: 4 }] },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, max: 100 }, y: { grid: { display: false } } } }
+        });
+    }
+
+    // Compare chart
+    const compareNames = simScored.map(p => p.name.substring(0, 18));
+    if (simChartCompare) {
+        simChartCompare.data.labels = compareNames;
+        simChartCompare.data.datasets[0].data = simScored.map(p => p.origTotal);
+        simChartCompare.data.datasets[1].data = simScored.map(p => p.total);
+        simChartCompare.update('none');
+    } else {
+        simChartCompare = new Chart(document.getElementById('chart-sim-compare'), {
+            type: 'bar', data: { labels: compareNames, datasets: [
+                { label: 'Original (40/25/20/15)', data: simScored.map(p => p.origTotal), backgroundColor: '#90CAF9' },
+                { label: 'Ajustado', data: simScored.map(p => p.total), backgroundColor: '#1565C0CC' },
+            ] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+                scales: { x: { grid: { display: false } }, y: { beginAtZero: true, max: 100 } } }
+        });
+    }
+
+    // Sim table
+    renderProjectTable('sim-table-container', simScored);
+}
+
+// ===== SROI CURVE =====
+function renderSROICurve() {
+    // Generate curve data
+    const xs = [], ysLog = [], ysDisc = [];
+    for (let x = 0.5; x <= 6; x += 0.05) {
+        xs.push(Math.round(x * 100) / 100);
+        ysLog.push(calcSROI(x));
+        // Discrete old
+        if (x < 1) ysDisc.push(0);
+        else if (x < 2) ysDisc.push(60);
+        else if (x < 3) ysDisc.push(80);
+        else ysDisc.push(95);
+    }
+
+    // Project points
+    const projPts = PROJECTS.map(p => ({ x: p.sroi, y: calcSROI(p.sroi) }));
+
+    new Chart(document.getElementById('chart-sroi-curve'), {
+        type: 'line', data: {
+            labels: xs,
+            datasets: [
+                { label: 'Logaritmica (nueva)', data: ysLog, borderColor: '#1565C0', backgroundColor: '#1565C020', borderWidth: 3, fill: true, tension: 0.1, pointRadius: 0 },
+                { label: 'Discreta (anterior)', data: ysDisc, borderColor: '#E53935', backgroundColor: 'transparent', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, stepped: true },
+                { label: 'Proyectos', data: projPts.map(pt => { const idx = xs.findIndex(v => Math.abs(v - pt.x) < 0.03); return idx >= 0 ? pt.y : null; }),
+                  borderColor: '#2E7D32', backgroundColor: '#4CAF50', pointRadius: 7, pointStyle: 'circle', showLine: false,
+                  // Use scatter-style by mapping to correct indices
+                },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
+                tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)} pts` } } },
+            scales: { x: { title: { display: true, text: 'Valor SROI', font: { weight: 'bold' } }, grid: { color: '#f0f0f0' } },
+                     y: { title: { display: true, text: 'Score (0-100)', font: { weight: 'bold' } }, beginAtZero: true, max: 105, grid: { color: '#f0f0f0' } } }
+        }
+    });
+
+    // Also add a scatter overlay for projects
+    const projScatter = document.getElementById('chart-sroi-curve');
+
+    // Impact chart: contribution to total
+    const impXs = [], impYs = [];
+    for (let x = 0.5; x <= 6; x += 0.1) {
+        impXs.push(x.toFixed(1));
+        impYs.push(Math.round(calcSROI(x) * 0.40 * 10) / 10);
+    }
+    new Chart(document.getElementById('chart-sroi-impact'), {
+        type: 'line', data: { labels: impXs, datasets: [
+            { label: 'Contribucion al Score Total (SROI x 40%)', data: impYs, borderColor: '#1565C0', backgroundColor: '#1565C030', borderWidth: 2, fill: true, tension: 0.1, pointRadius: 0 },
+        ] },
+        options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} pts de 100` } } },
+            scales: { x: { title: { display: true, text: 'Valor SROI' }, grid: { color: '#f0f0f0' } },
+                     y: { title: { display: true, text: 'Puntos al Score Total (max 40)' }, beginAtZero: true, max: 45, grid: { color: '#f0f0f0' } } }
+        }
+    });
+}
+
+// ===== TAB SWITCHING =====
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    event.target.classList.add('active');
+    if (tab === 'simulator' && !simChartRanking) updateSim();
+    if (tab === 'sroi' && !document.getElementById('chart-sroi-curve').chart) renderSROICurve();
+}
+
+// ===== INIT =====
+renderDashboard();
+</script>
+</body>
+</html>

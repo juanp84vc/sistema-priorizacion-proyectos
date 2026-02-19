@@ -6,6 +6,24 @@ Este documento describe las mejoras planificadas para el Sistema de Priorizació
 
 ## ✅ Mejoras Implementadas Recientemente
 
+### 0. **Integración Metodología CONFIS** ✅ IMPLEMENTADO (v2.1.0 — Feb 2026)
+
+Integración completa de la metodología oficial del CONFIS (Anexo 2) al sistema de priorización:
+
+- **Gate de elegibilidad**: Solo municipios PDET/ZOMAC/Amazonía son elegibles para OxI
+- **8 grupos de priorización**: PATR-PDET, PDET, ZOMAC, Amazonía × estructuración
+- **Fórmula oficial**: Score = GrupoPriorización×20% + ScoreCONFIS×80%
+- **Puntaje territorial**: IPM + MDM + IICA + CULTIVOS (promedio 1-10)
+- **Alcance territorial**: Integración de puntaje CONFIS en criterio Stakeholders
+- **SROI logarítmico**: Función continua min(100, max(0, 28.43×log₁₀(SROI)+60))
+- **Riesgos como alertas**: Factores automáticos convertidos a alertas informativas
+
+**Entregables actualizados**: Excel (fórmulas CONFIS + hoja Metodología), Dashboard HTML, Guía Operativa v2.1, README.md
+
+**Tests**: 134/134 passing (100%)
+
+---
+
 ### 1. **Persistencia de Datos con Base de Datos SQLite** ✅ IMPLEMENTADO (v1.3.0)
 Los proyectos ahora se guardan permanentemente en una base de datos SQLite:
 
@@ -294,11 +312,13 @@ Para solicitar la implementación de alguna mejora específica o reportar issues
 
 ---
 
-**Última actualización**: 2025-01-12
-**Versión del sistema**: 1.3.0
+**Última actualización**: 2026-02-19
+**Versión del sistema**: 2.1.0
 
 **Historial de versiones**:
-- v1.3.0 (2025-01-12): Persistencia con SQLite
-- v1.2.0 (2025-01-12): Búsqueda y edición de proyectos
-- v1.1.0 (2025-01-12): Sistema de recomendaciones
-- v1.0.0 (2025-01-11): Versión inicial
+- v2.1.0 (2026-02): Integración CONFIS — gate elegibilidad, 8 grupos priorización, fórmula Anexo 2, entregables actualizados (134 tests)
+- v2.0.0 (2025-11): Arquitectura C completa — SROI logarítmico, rúbricas stakeholders, alertas riesgos (129 tests)
+- v1.3.0 (2025-01): Persistencia con SQLite
+- v1.2.0 (2025-01): Búsqueda y edición de proyectos
+- v1.1.0 (2025-01): Sistema de recomendaciones
+- v1.0.0 (2025-01): Versión inicial
